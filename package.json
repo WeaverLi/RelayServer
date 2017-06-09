@@ -1,0 +1,23 @@
+{
+  "name": "RelayServer",
+  "private": true,
+  "version": "0.0.1",
+  "main": "",
+  "repository": "",
+  "keywords": [],
+  "author": "WeaverLi",
+  "scripts": {
+    "tcpServer": "node tcpServer.js",
+    "httpServer": "node httpServer.js"
+  },
+  "devDependencies": {
+    "body-parser": "^1.17.2",
+    "cookie-parser": "^1.4.3",
+    "express": "^4.15.3",
+    "morgan": "^1.8.2",
+    "net": "^1.0.2",
+    "request": "^2.81.0",
+    "request-promise": "^4.2.1"
+  },
+  "dependencies": {}
+}
