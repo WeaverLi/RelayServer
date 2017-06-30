@@ -1,22 +1,29 @@
 const net = require('net');
 
 const writeData = require('./util');
+const Decode = require('./device/decode');
 
 const server = net.createServer();
 
+// 监听新的设备连接
 server.on('connection', client => {
   console.log('Client connection');
   console.log(' local = %s:%s', client.localAddress, client.localPort);
   console.log(' remote = %s:%s', client.remoteAddress, client.remotePort);
 
-  client.setTimeout(21000);
-  client.setEncoding('hex');
-  const sendData = '7e4d00bc 000004d2 00000004 00000004 00000000 00a00100 027f7f7f 0cffa919 be199518 9518bf17 97179518 bf179618 9518bf17 96179618 95189617 96179618 95189617 96179618 9518bf17 bf189617 96179618 95189617 bf179618 bf179617 9618bf17 9617ffff fffffff6 18bf1796 17961796 18bf1796 17961895 18961796 17961895 189617bf 18951896 17961796 18951896 17961796 17961896 17961796 17961896 17961796 179618bf 17ffffff ffffffff ffffffff 10000000';
+  // 心跳定时20s
+  // client.setTimeout(20000);
+  // 接收数据的编码
+  // client.setEncoding('hex');
 
-  client.on('data', data => {
-    console.log('Received data from client on port %d:', client.remotePort, data);
+  // 监听来自设备的数据，数据(receivedBuffer)为Buffer对象
+  client.on('data', receivedBuffer => {
+    console.log('Received data from client on port %d:', client.remotePort, receivedBuffer);
     console.log('Bytes received: ', client.bytesRead);
     server.getConnections((err, count) => console.log('Remaining Connections: ' + count));
+
+    // const de = new Decode(receivedBuffer);
+    // console.log(de);
 
     // writeData(client, sendData);
     // console.log('Bytes sent: ', client.bytesWritten);
@@ -30,12 +37,14 @@ server.on('connection', client => {
 
   client.on('error', err => console.log('Socket Error: ', JSON.stringify(err)));
 
+  // 设定的周期内没有接收到心跳时触发
   client.on('timeout', () => {
     console.log('Socket Time Out');
     client.end();
   });
 });
 
+// 服务器监听的IP和端口号
 server.listen(5001, '192.168.0.108', () => {
   console.log('Server listening: ', JSON.stringify(server.address()));
 
