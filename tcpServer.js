@@ -52,3 +52,5 @@ server.listen(5001, '192.168.0.108', () => {
 
   server.on('error', err => console.log('Server Error: ', JSON.stringify(err)));
 });
+
+module.exports = server;

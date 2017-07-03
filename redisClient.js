@@ -6,6 +6,9 @@ const redisClient = redis.createClient({
   port: 6379
 });
 
+// redis连接成功
+redisClient.on('connect', () => console.log('Redis Connect Successfully!'));
+
 // redis 链接错误
 redisClient.on('error', err => console.log(err));
 
