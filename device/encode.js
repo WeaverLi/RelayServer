@@ -2,10 +2,7 @@ const encodeHead = Symbol('encodeHead');
 const encodeBody = Symbol('encodeBody');
 const byteOffset = 16;
 
-const MSG_R_BODY = {len: 20, name: '', val: 0};
-const MSG_r_BODY = {a: 0, b: '', c: 0};
-const MSG_M_BODY = {/*???*/};
-const MSG_H_BODY = {/*???*/};
+
 
 // 生成对应类型的数据格式
 class CreateMsg {
