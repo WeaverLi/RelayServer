@@ -1,6 +1,6 @@
 class DeviceBuffer {
-  constructor() {
-
+  constructor(tcpClient) {
+    this.tcpClient = tcpClient;
   }
 
 
