@@ -14,6 +14,7 @@ class Decode {
     this.devID = dataHead.getUint32(12);
 
     this.bodys = this[decodeBody](data.buffer, byteOffset, buffer.length);
+
   }
 
   // 私有方法，解码bodys内容

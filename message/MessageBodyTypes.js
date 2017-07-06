@@ -11,8 +11,8 @@ export const MSG_R_REGIST_REQ = {
   devType: 0,
   hVer: 0,
   sVer: 0,
-//  devName: '',
-//  seriaNo: ''
+  devName: '',
+  seriaNo: ''
 };
 
 // 心跳请求消息,多个通道的消息
@@ -80,12 +80,11 @@ export const MSG_H_COMMAND_RES = {
   chnlParam: '',
 };
 
-
-const heartBeat16 = ({type, number, param}) => {
+function heartBeat16({type, number, param}) {
   const heartBearArr = new Array(16);
   for (let item of heartBearArr) {
     item = {type, number, param};
   }
 
   return heartBearArr;
-};
+}

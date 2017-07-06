@@ -1,8 +1,4 @@
 const net = require('net');
-
-const writeData = require('./util');
-const Decode = require('./device/decode');
-
 const server = net.createServer();
 
 // 监听新的设备连接
@@ -12,7 +8,7 @@ server.on('connection', client => {
   console.log(' remote = %s:%s', client.remoteAddress, client.remotePort);
 
   // 心跳定时20s
-  // client.setTimeout(20000);
+  client.setTimeout(20000);
   // 接收数据的编码
   // client.setEncoding('hex');
 
@@ -21,9 +17,6 @@ server.on('connection', client => {
     console.log('Received data from client on port %d:', client.remotePort, receivedBuffer);
     console.log('Bytes received: ', client.bytesRead);
     server.getConnections((err, count) => console.log('Remaining Connections: ' + count));
-
-    // const de = new Decode(receivedBuffer);
-    // console.log(de);
 
     // writeData(client, sendData);
     // console.log('Bytes sent: ', client.bytesWritten);

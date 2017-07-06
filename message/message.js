@@ -10,9 +10,11 @@ const {
 } = require('./MessageBodyTypes');
 
 // 私有方法名定义为Symbol类型
-const encodeHead = Symbol('encodeHead');
-const encodeBody = Symbol('encodeBody');
-const decodeBody = Symbol('decodeBody');
+const encodeHead = Symbol('encodeHead');                    // 私有方法名，编码消息头部（20字节）
+const encodeBody = Symbol('encodeBody');                    // 私有方法名，编码消息主体部分
+const decodeBody = Symbol('decodeBody');                    // 私有方法名，解码消息主体部分
+const decodeStr = Symbol('decodeStr');                      // 私有方法名，解码字符串('R'中设备型号，序列号)
+const decodeHeartBeatArr = Symbol('decodeHeartBeatArr');    // 私有方法名，解码设备心跳请求（16通道）
 
 const byteOffset = 16;
 
@@ -136,9 +138,28 @@ class Message {
     this[encodeHead](bufferHead);
     this[encodeBody](bufferBodyArr);
 
-    return Array.apply([], new Uint8Array(buffer));
-
+    // return Array.apply([], new Uint8Array(buffer));
+    return buffer;
   }
+
+  // 解码
+  decode(buffer) {
+    const data = new Uint8Array(buffer);
+    const bufferHead = new DataView(data.buffer, 0, byteOffset);
+    const bufferBody = new DataView(data.buffer, byteOffset, buffer.byteLength - 20);
+
+    this.type = String.fromCharCode(bufferHead.getUint8(1));
+    this.length = bufferHead.getUint16(2);
+
+    this.token = bufferHead.getUint32(4);
+    this.netID = bufferHead.getUint32(8);
+    this.devID = bufferHead.getUint32(12);
+
+    this.bodys = this[decodeBody](bufferBody);
+
+    return this;
+  }
+
 
   // 私有方法，编码头部
   [encodeHead](bufferHead) {
@@ -217,34 +238,65 @@ class Message {
     }
   }
 
-  // 解码
-  decode(buffer) {
-    const data = new Uint8Array(buffer);
-    const bufferHead = new DataView(data.buffer, 0, byteOffset);
-    const bufferBody = new DataView(data.buffer, byteOffset, buffer.byteLength - 20);
-
-    this.type = String.fromCharCode(bufferHead.getUint8(1));
-    this.length = bufferHead.getUint16(2);
-
-    this.token = bufferHead.getUint32(4);
-    this.netID = bufferHead.getUint32(8);
-    this.devID = bufferHead.getUint32(12);
-
-    this.bodys = this[decodeBody](bufferBody);
-  }
-
   // 私有方法，解码bodys内容
   [decodeBody](bufferBody) {
     const bodys = [];
-    const bufferBodys = [];
+    const pointer = [];
 
     if (bufferBody.byteLength !== 0) {
       const bodyLen = bufferBody.getUint8(1) + 1;
 
       for (let i = 0; i < bodyLen; i++) {
+        if (i === 0) {
+          pointer[0] = 0;
+        }
+        else {
+          pointer[i] = pointer[i - 1] + bufferBody.getUint16(pointer[i - 1] + 2) + 4;
+        }
+      }
+
+      for (let i = 0; i < bodyLen; i++) {
         switch (this.type) {
           case 'R':
-            switch (bufferBody.getUint8(i * bufferBody.getUint16(2))) {
+            switch (bufferBody.getUint8(pointer[i])) {
+              case 0x01:
+                if (this.netID === 0 && this.devID === 0) { // 注册
+                  bodys[i] = {
+                    rType: bufferBody.getUint8(pointer[i]),
+                    rCnt: bufferBody.getUint8(pointer[i] + 1),
+                    rLen: bufferBody.getUint16(pointer[i] + 2),
+
+                    devType: bufferBody.getUint32(pointer[i] + 4),
+                    hVer: bufferBody.getUint16(pointer[i] + 8),
+                    sVer: bufferBody.getUint16(pointer[i] + 10),
+                    devName: this[decodeStr](bufferBody, pointer[i] + 12, 32),
+                    seriaNo: this[decodeStr](bufferBody, pointer[i] + 44, 32)
+                  }
+                } else {                                    // 登录
+                  bodys[i] = {
+                    rType: bufferBody.getUint8(pointer[i]),
+                    rCnt: bufferBody.getUint8(pointer[i] + 1),
+                    rLen: bufferBody.getUint16(pointer[i] + 2),
+
+                    devType: bufferBody.getUint32(pointer[i] + 4),
+                    hVer: bufferBody.getUint16(pointer[i] + 8),
+                    sVer: bufferBody.getUint16(pointer[i] + 10),
+                    devName: this[decodeStr](bufferBody, pointer[i] + 12, 32),
+                    seriaNo: this[decodeStr](bufferBody, pointer[i] + 44, 32)
+                  }
+                }
+                break;
+
+              case 0x02:
+                bodys[i] = {
+                  rType: bufferBody.getUint8(pointer[i]),
+                  rCnt: bufferBody.getUint8(pointer[i] + 1),
+                  rLen: bufferBody.getUint16(pointer[i] + 2),
+
+                  heartBeat: this[decodeHeartBeatArr](bufferBody, pointer[i] + 4, 64)
+
+                };
+                break;
             }
 
             break;
@@ -254,17 +306,52 @@ class Message {
             break;
           case 'H':           // 不需要解码
             break;
-          case 'm':
+          case 'm':      // 'm'没有bodys
+            // bodys[]为空
             break;
           case 'h':
+            bodys[i] = {
+              chnlType: bufferBody.getUint8(pointer[i]),
+              chnlNumber: bufferBody.getUint8(pointer[i] + 1),
+              chnlParam: bufferBody.getUint16(pointer[i] + 2)
+            };
             break;
-
-
+          default:
+            break;
         }
       }
     }
+
+    return bodys;
+  }
+
+  // 私有方法，解码字符串码
+  [decodeStr](dataView, offset, byteLen) {
+    let strLen = 0;
+    while (dataView.getUint8(offset + strLen) !== 0) strLen++;
+
+    if (strLen <= byteLen) {
+      const strbuf = new Uint8Array(dataView.buffer, offset, strLen);
+      return String.fromCharCode.apply(String, strbuf);
+    }
+    else {
+      console.log(new Error('string outside the bounds of the DatatView!'));
+    }
+  }
+
+  // 私有方法，解码心跳响应数组内容
+  [decodeHeartBeatArr](dataView, offset, byteLen) {
+    const heartBeatArr = [];
+
+    for (let i = 0; i < 16; i++) {
+      const type = dataView.getUint8(offset + i * 4);
+      const number = dataView.getUint8(offset + i * 4 + 1);
+      const param = dataView.getUint16(offset + i * 4 + 2);
+      heartBeatArr.push({type, number, param});
+    }
+
+    return heartBeatArr;
   }
 }
-
 
 module.exports = Message;
