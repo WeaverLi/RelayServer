@@ -3,7 +3,7 @@ const logger = require('morgan');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 
-const routes = require('./adminBG/fromAdminBG');
+const routes = require('./routes');
 
 const app = express();
 

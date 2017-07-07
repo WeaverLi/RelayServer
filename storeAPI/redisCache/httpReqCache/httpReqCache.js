@@ -1,8 +1,9 @@
 const uuidv1 = require('uuid/v1');
+
 const saveToRedis = Symbol('saveToRedis');
 const delFromRedis = Symbol('delFromRedis');
 
-class HttpBuffer {
+class HttpReqCache {
   constructor(redisClient) {
     this.redisClient = redisClient;
   }
@@ -36,6 +37,10 @@ class HttpBuffer {
     });
   }
 
+  find(id){
+
+  }
+
   [saveToRedis](uuid, req, res) {
     return new Promise((resolve, reject) => {
       this.redisClient.hmset(
@@ -65,4 +70,4 @@ class HttpBuffer {
   }
 }
 
-module.exports = HttpBuffer;
+module.exports = HttpReqCache;

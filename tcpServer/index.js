@@ -1,6 +1,8 @@
 const net = require('net');
 const server = net.createServer();
 
+const messageHandle = require('./messageHandle');
+
 // 监听新的设备连接
 server.on('connection', client => {
   console.log('Client connection');
@@ -13,15 +15,17 @@ server.on('connection', client => {
   // client.setEncoding('hex');
 
   // 监听来自设备的数据，数据(receivedBuffer)为Buffer对象
-  client.on('data', receivedBuffer => {
-    console.log('Received data from client on port %d:', client.remotePort, receivedBuffer);
-    console.log('Bytes received: ', client.bytesRead);
-    server.getConnections((err, count) => console.log('Remaining Connections: ' + count));
+  // client.on('data', receivedBuffer => {
+  //   console.log('Received data from client on port %d:', client.remotePort, receivedBuffer);
+  //   console.log('Bytes received: ', client.bytesRead);
+  //   server.getConnections((err, count) => console.log('Remaining Connections: ' + count));
+  //
+  //   // writeData(client, sendData);
+  //   // console.log('Bytes sent: ', client.bytesWritten);
+  //   // client.end();
+  // });
 
-    // writeData(client, sendData);
-    // console.log('Bytes sent: ', client.bytesWritten);
-    // client.end();
-  });
+  client.on('data', messageHandle);
 
   client.on('end', () => {
     console.log(`Client ${client.remoteAddress + ':' + client.remotePort} disconnected`);
