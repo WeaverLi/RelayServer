@@ -1,7 +1,7 @@
 const net = require('net');
 
 function getConnection(connName) {
-  const client = net.connect({port: 5001, host: '192.168.0.108'}, () => {
+  const client = net.connect({port: 3000, host: 'localhost'}, () => {
     console.log(connName + ' Connected:');
     console.log(' local = %s:%s', client.localAddress, client.localPort);
     console.log(' remote = %s:%s', client.remoteAddress, client.remotePort);

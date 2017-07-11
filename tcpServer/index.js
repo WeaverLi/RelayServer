@@ -25,7 +25,9 @@ server.on('connection', client => {
   //   // client.end();
   // });
 
-  client.on('data', messageHandle);
+  client.on('data', messageBuffer => {
+    messageHandle(client, messageBuffer);
+  });
 
   client.on('end', () => {
     console.log(`Client ${client.remoteAddress + ':' + client.remotePort} disconnected`);
@@ -42,7 +44,7 @@ server.on('connection', client => {
 });
 
 // 服务器监听的IP和端口号
-server.listen(5001, '192.168.0.108', () => {
+server.listen(/*5001, '192.168.0.108',*/3000, 'localhost', () => {
   console.log('Server listening: ', JSON.stringify(server.address()));
 
   server.on('close', () => console.log('Server Terminated'));
