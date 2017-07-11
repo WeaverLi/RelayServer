@@ -1,6 +1,6 @@
 const rp = require('request-promise');
 const {addDevObjToRedis, updateDevObjToRedis} = require('../../storeAPI/devObjAPI');
-const writeData = require('../util');
+const writeData = require('../../util');
 const Message = require('../../message');
 
 

@@ -1,5 +1,5 @@
 const getConnection = require('./connection');
-const writeData = require('../../tcpServer/util');
+const writeData = require('../../util');
 
 /* 建立客户端与服务器的连接 */
 const coon1 = getConnection('coon1');

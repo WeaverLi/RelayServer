@@ -31,6 +31,15 @@ class DeviceObjCache {
     })
   }
 
+  async find(id){
+    return await new Promise((resolve,reject)=>{
+      this.redisClient.hgetall(id,(err,res)=>{
+        if (err) reject(err);
+        resolve(res);
+      });
+    })
+  }
+
   async del(id) {
     return await new Promise((resolve, reject) => {
       this.redisClient.del(`http:${id}`, (err, res) => {

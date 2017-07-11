@@ -11,6 +11,10 @@ export const updateDevObjToRedis = (id, Obj) => {
   return DevObjs.update(id,Obj);
 };
 
+export const findDevObjFromRedis=id=>{
+  return DevObjs.find(id);
+};
+
 export const delDevObjFromRedis = id => {
   return DevObjs.del(id);
 };
