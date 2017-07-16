@@ -3,7 +3,7 @@
  */
 
 // 注册(登录)请求消息
-export const MSG_R_REGIST_REQ = {
+const MSG_R_REGIST_REQ = {
   rType: 1,
   rCnt: 0,
   rLen: 0,
@@ -16,7 +16,7 @@ export const MSG_R_REGIST_REQ = {
 };
 
 // 心跳请求消息,多个通道的消息
-export const MSG_R_HEARTBEAT_REQ = {
+const MSG_R_HEARTBEAT_REQ = {
   rType: 2,
   rCnt: 0,
   rLen: 0,
@@ -25,7 +25,7 @@ export const MSG_R_HEARTBEAT_REQ = {
 };
 
 // 注册(登录)响应消息
-export const MSG_R_REGIST_RES = {
+const MSG_R_REGIST_RES = {
   rType: 1,
   rCnt: 0,
   rLen: 0,
@@ -36,7 +36,7 @@ export const MSG_R_REGIST_RES = {
 };
 
 // 心跳响应消息
-export const MSG_R_HEARTBEAT_RES = {
+const MSG_R_HEARTBEAT_RES = {
   rType: 2,
   rCnt: 0,
   rLen: 0,
@@ -50,7 +50,7 @@ export const MSG_R_HEARTBEAT_RES = {
  */
 
 // 控制请求消息
-export const MSG_M_COMMAND_REQ = {
+const MSG_M_COMMAND_REQ = {
   chnlType: '',
   chnlNumber: 0,
   chnlParam: '',
@@ -64,17 +64,17 @@ export const MSG_M_COMMAND_REQ = {
 };
 
 // 查询请求消息
-export const MSG_H_COMMAND_REQ = {
+const MSG_H_COMMAND_REQ = {
   chnlType: '',
   chnlNumber: 0,
   chnlParam: '',
 };
 
 // 控制成功应答消息
-export const MSG_M_COMMAND_RES = {};
+const MSG_M_COMMAND_RES = {};
 
 // 查询成功应答消息
-export const MSG_H_COMMAND_RES = {
+const MSG_H_COMMAND_RES = {
   chnlType: '',
   chnlNumber: 0,
   chnlParam: '',
@@ -88,3 +88,14 @@ function heartBeat16({type, number, param}) {
 
   return heartBearArr;
 }
+
+module.exports = {
+  MSG_R_REGIST_REQ,
+  MSG_R_HEARTBEAT_REQ,
+  MSG_R_REGIST_RES,
+  MSG_R_HEARTBEAT_RES,
+  MSG_M_COMMAND_REQ,
+  MSG_H_COMMAND_REQ,
+  MSG_M_COMMAND_RES,
+  MSG_H_COMMAND_RES
+};

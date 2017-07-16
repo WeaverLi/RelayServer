@@ -3,50 +3,42 @@ class DeviceObjCache {
     this.redisClient = redisClient;
   }
 
-  async add({tcpClient, token, netID, devID}) {
-    return await new Promise((resolve, reject) => {
-      this.redisClient.hmset(
-          `${netID}-${devID}`,
-          {
-            tcpClient,
-            token
-          },
-          (err, res) => {
-            if (err) reject(err);
-            resolve(res);
-          });
+  add({tcpClient, token, netID, devID}) {
+    this.redisClient.hmset(
+        `${netID}-${devID}`,
+        {
+          tcpClient,
+          token
+        },
+        (err, res) => {
+          if (err) return err;
+          return res;
+        });
+  }
+
+  update(id, Obj) {
+    this.redisClient.hgetall(id, (err, res) => {
+      if (err) return err;
+
+      this.redisClient.hmset(id, Object.assign(res, Obj), (err, res) => {
+        if (err) return err;
+        return res;
+      });
     });
   }
 
-  async update(id, Obj) {
-    return await new Promise((resole, reject) => {
-      this.redisClient.hgetall(id, (err, res) => {
-        if (err) reject(err);
-
-        this.redisClient.hmset(id, Object.assign(res, Obj), (err, res) => {
-          if (err) reject(err);
-          resole(res);
-        });
-      });
-    })
+  async find(id) {
+    this.redisClient.hgetall(id, (err, res) => {
+      if (err) return err;
+      return res;
+    });
   }
 
-  async find(id){
-    return await new Promise((resolve,reject)=>{
-      this.redisClient.hgetall(id,(err,res)=>{
-        if (err) reject(err);
-        resolve(res);
-      });
-    })
-  }
-
-  async del(id) {
-    return await new Promise((resolve, reject) => {
-      this.redisClient.del(`http:${id}`, (err, res) => {
-        if (err) reject(err);
-        resolve(res);
-      });
-    })
+  del(id) {
+    this.redisClient.del(`http:${id}`, (err, res) => {
+      if (err) return err;
+      return res;
+    });
   }
 }
 

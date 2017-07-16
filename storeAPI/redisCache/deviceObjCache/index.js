@@ -1,3 +1,3 @@
-const DeviceObjCache=require('./devObjCache');
+const DeviceObjCache = require('./devObjCache');
 
-module.exports=DeviceObjCache;
+module.exports = DeviceObjCache;

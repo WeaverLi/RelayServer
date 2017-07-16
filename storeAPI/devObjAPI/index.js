@@ -3,18 +3,25 @@ const redisClient = require('../redisClient');
 
 const DevObjs = new DeviceObjCache(redisClient);
 
-export const addDevObjToRedis = (tcpClient, token, netID, devID) => {
+const addDevObjToRedis = (tcpClient, token, netID, devID) => {
   return DevObjs.add({tcpClient, token, netID, devID});
 };
 
-export const updateDevObjToRedis = (id, Obj) => {
-  return DevObjs.update(id,Obj);
+const updateDevObjToRedis = (id, Obj) => {
+  return DevObjs.update(id, Obj);
 };
 
-export const findDevObjFromRedis=id=>{
+const findDevObjFromRedis = id => {
   return DevObjs.find(id);
 };
 
-export const delDevObjFromRedis = id => {
+const delDevObjFromRedis = id => {
   return DevObjs.del(id);
+};
+
+module.exports = {
+  addDevObjToRedis,
+  updateDevObjToRedis,
+  findDevObjFromRedis,
+  delDevObjFromRedis
 };

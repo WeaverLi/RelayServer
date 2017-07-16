@@ -1,10 +1,10 @@
 const Message = require('../../../message');
-const {findDevObjFromRedis}=require('../../../storeAPI/devObjAPI');
-const writeData=require('../../../util');
+const {findDevObjFromRedis} = require('../../../storeAPI/devObjAPI');
+const writeData = require('../../../util');
 // 加载命令文件
 
 const control = (req, res) => {
-  const {}=req.body;
+  const {} = req.body;
   // 查找对应命令文件
 
   // 封装消息

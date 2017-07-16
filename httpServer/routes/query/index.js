@@ -1,6 +1,6 @@
 const Message = require('../../../message');
-const {findDevObjFromRedis}=require('../../../storeAPI/devObjAPI');
-const writeData=require('../../../util');
+const {findDevObjFromRedis} = require('../../../storeAPI/devObjAPI');
+const writeData = require('../../../util');
 
 const query = (req, res) => {
   const {token, netID, devID, chnlType, chnlNumber, chnlParam} = req.query;
@@ -11,9 +11,9 @@ const query = (req, res) => {
   const msgBuffer = queryMessage.encode();
 
   // 查找设备对象并发查询请求给对应设备
-  findDevObjFromRedis(`${netID}-${devID}`).then(result=>{
-    writeData(result.tcpClient,msgBuffer);
-  }).catch(err=>{
+  findDevObjFromRedis(`${netID}-${devID}`).then(result => {
+    writeData(result.tcpClient, msgBuffer);
+  }).catch(err => {
     console.log(err);
     return err;
   });

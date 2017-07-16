@@ -9,4 +9,6 @@ const control = require('./control');
 router.post('/api/query', addHttpReqToRedis, query);
 
 // 控制
-router.post('/api/control',addHttpReqToRedis,control);
+router.post('/api/control', addHttpReqToRedis, control);
+
+module.exports=router;

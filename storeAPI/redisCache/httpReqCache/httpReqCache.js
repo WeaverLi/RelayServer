@@ -5,39 +5,33 @@ class HttpReqCache {
     this.redisClient = redisClient;
   }
 
-  async add({req, res}) {
+  add({req, res}) {
     const uuid = uuidv1();
 
-    return await new Promise((resolve, reject) => {
-      this.redisClient.hmset(
-          `http:${uuid}`,
-          {
-            req: JSON.stringify(req),
-            res: JSON.stringify(res)
-          },
-          (err,res) => {
-            if (err) reject(err);
-            resolve(uuid);
-          }
-      );
-    });
+    this.redisClient.hmset(
+        `http:${uuid}`,
+        {
+          req: JSON.stringify(req),
+          res: JSON.stringify(res)
+        },
+        (err, res) => {
+          if (err) return err;
+          return uuid;
+        }
+    );
   }
 
-  async find(id) {
-    return await new Promise((resolve,reject)=>{
-      this.redisClient.hgetall(`http:${id}`,(err,res)=>{
-        if(err) reject(err);
-        resolve(res);
-      })
-    });
+  find(id) {
+    this.redisClient.hgetall(`http:${id}`, (err, res) => {
+      if (err) return err;
+      return res;
+    })
   }
 
-  async del(id) {
-    return await new Promise((resolve, reject) => {
-      this.redisClient.del(`http:${id}`, (err, res) => {
-        if (err) reject(err);
-        resolve(res);
-      });
+  del(id) {
+    this.redisClient.del(`http:${id}`, (err, res) => {
+      if (err) return err;
+      return res;
     });
   }
 }

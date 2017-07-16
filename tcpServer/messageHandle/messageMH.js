@@ -1,4 +1,4 @@
-const {findHttpReqFromRedis,delHttpReqFromRedis} = require('../../storeAPI/httpReqAPI');
+const {findHttpReqFromRedis, delHttpReqFromRedis} = require('../../storeAPI/httpReqAPI');
 
 const messageMHHandle = (tcpClient, msg) => {
   if (msg.type === 'm') {

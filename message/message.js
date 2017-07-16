@@ -29,6 +29,15 @@ class Message {
   }
 
   addBody(msgBodyType, msgBody) {
+    const R_REGIST_REQ = MSG_R_REGIST_REQ,
+        R_HEARTBEAT_REQ = MSG_R_HEARTBEAT_REQ,
+        R_REGIST_RES = MSG_R_REGIST_RES,
+        R_HEARTBEAT_RES = MSG_R_HEARTBEAT_RES,
+        M_COMMAND_REQ = MSG_M_COMMAND_REQ,
+        H_COMMAND_REQ = MSG_H_COMMAND_REQ,
+        M_COMMAND_RES = MSG_M_COMMAND_RES,
+        H_COMMAND_RES = MSG_H_COMMAND_RES;
+
     switch (this.type) {
       case 'R':                  // 应该用不到
         switch (msgBodyType) {
