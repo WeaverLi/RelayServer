@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const Command=require('./command');
+const Command = require('./command');
 
 const {
   readFile,
@@ -48,7 +48,7 @@ class ConfigFile {
 
     //获得循环次数
     const loopct = (fileInfo.ekind === T_AC) ? fileInfo.indexAreaSize : fileInfo.cmdNum;
-    const loaded = 0;
+    let loaded = 0;
 
     for (let i = 0; i < loopct; i++) {
       const cmdInfo = readCommand(fileBuffer, fileInfo, i);
@@ -62,7 +62,7 @@ class ConfigFile {
       if (cmdInfo.length > fileInfo.cmdSize - fileInfo.cmdHeadSize)
         cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
 
-      const tmp = new Array(160);//自动生成配码命令（根据保存的命令名字）
+      const tmp = Buffer.alloc(160);//自动生成配码命令（根据保存的命令名字）
       let rf = 1;//是否重新创建命令，0表示直接读取文件中的命令码
       if ((fileInfo.eKind & MASK_MASK) === MASK_2262) {// 生成12个2bit，存到12字节中，文件内容无意义
         cmdInfo.length = 12;
@@ -71,12 +71,14 @@ class ConfigFile {
           tmp[j] = (rfcode & (0x03 << j)) >> j;
         tmp[10] = i % 3;//0,1,2
         tmp[11] = i / 3;//0,1,2
-      } else if ((fileInfo.eKind & MASK_MASK) === MASK_1527) {// 生成24个1bit，存到24字节中，文件内容无意义
+      }
+      else if ((fileInfo.eKind & MASK_MASK) === MASK_1527) {// 生成24个1bit，存到24字节中，文件内容无意义
         cmdInfo.length = 24;
         const rfcode = (this.aid & 0x1fffff) | ((i + 1) << 21);//取21bit,i的3bit最多8个命令
         for (let j = 0; j < 24; j++)
           tmp[j] = (rfcode & (1 << j)) >> j;
-      } else if ((fileInfo.eKind & MASK_MASK) === MASK_WAVEKC) {//根据aid和命令的keycode决定如何生成命令，文件内容无意义
+      }
+      else if ((fileInfo.eKind & MASK_MASK) === MASK_WAVEKC) {//根据aid和命令的keycode决定如何生成命令，文件内容无意义
         //前4个字节在文件中应该也有，可以读4个字节，也可以根据key重新生成。
         cmdInfo.length = 4;//MASK_TWAVE命令前四个字节为发送方式
         CmdKeyCode * kc = (CmdKeyCode *)( & cinfo.key
@@ -92,7 +94,8 @@ class ConfigFile {
           cmdInfo.length = buildBOFU(tmp, this.aid, i);
 
         //不支持的直接返回4，模块不会处理，app可以提示不支持
-      } else if ((fileInfo.eKind & MASK_MASK) === MASK_STATE) {//状态命令
+      }
+      else if ((fileInfo.eKind & MASK_MASK) === MASK_STATE) {//状态命令
         cmdInfo.length = 4;//取得key即可，无需读取文件
         tmp[0] = cmdInfo.key;//状态码，发给设备
         tmp[1] = 0;
@@ -100,12 +103,40 @@ class ConfigFile {
         tmp[3] = 0;//保留，对齐。
 
         rf = 0;//还是读文件吧，将忽略上面的tmp
-      } else if ((fileInfo.eKind & MASK_MASK) === MASK_WAVE) {//通用波形（备用），正常读取文件，直接TWAVE发送
+      }
+      else if ((fileInfo.eKind & MASK_MASK) === MASK_WAVE) {//通用波形（备用），正常读取文件，直接TWAVE发送
         rf = 0;//命令已经是TWAVE，无须再转
-      } else//红外调制波形MASK_IR，正常读取文件
+      }
+      else//红外调制波形MASK_IR，正常读取文件
         rf = 0;
+
+      let cmdBuffer, cmdArr;
+      //读取命令码
+      if (rf === 0) {
+        cmdBuffer = fileBuffer.readUIntBE(cmdInfo.offset, cmdInfo.length);
+      }
+      else { //创建命令
+        cmdBuffer = tmp.readUIntBE(0, cmdInfo.length);
+      }
+      cmdArr = new Uint8Array(cmdBuffer);
+
+      const command = new Command({
+        name: cmdInfo.name,
+        locate: cmdInfo.locate,
+        style: cmdInfo.style,
+        cmd: cmdArr
+      });
+
+      this.addCommand(cmdInfo.key, command);
+      loaded++;
     }
 
+    // fclose(file);
+    console.log("load cmdnum = %d,loop count=%d,loaded=%d. %x",fileInfo.cmdNum,loopct,loaded,fileInfo.eKind);
+    return loaded;
+  }
+
+  storeFile(fileName){
 
   }
 
@@ -169,6 +200,18 @@ class ConfigFile {
 
   getParam() {
     return 0;
+  }
+
+  addCommand(key, Command) {
+
+  }
+
+  delCommand(Command) {
+
+  }
+
+  getCommand({key = null, name = null}) {
+
   }
 }
 
