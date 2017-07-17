@@ -7,6 +7,10 @@ class Command {
     this.key = 0x0000;
   }
 
+  getCmds(){
+    return this.cmd;
+  }
+
   setCmds(cmd, start, size) {
 
   }
