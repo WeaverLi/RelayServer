@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const Command = require('./command');
+const {FileInfo, CmdInfo} = require('./fileTypes');
 
 const {
   readFile,
@@ -20,9 +21,9 @@ class ConfigFile {
     this.type = 0;    //0自定义
     this.aid = aid;   //所属电器id，对无线命令码的生成有作用
 
-    this.cmds = [];
-    this.map = [];
-    this.map2 = [];
+    this.cmds = [];   // cmds = new ArrayList<Command>();
+    this.map = new Map();
+    this.map2 = new Map();
 
     this.applianceType = '';
     this.manufact = '';
@@ -31,7 +32,7 @@ class ConfigFile {
 
   async loadFile(fileName) {
     const fileBuffer = await new Promise((resolve, reject) => {
-      fs.readFile(__dirname + '/airConditioning.cfg', (err, buf) => {
+      fs.readFile(__dirname + `/${fileName}`, (err, buf) => {
         if (err) {
           console.log('read file ERROR!');
           reject(err);
@@ -132,12 +133,68 @@ class ConfigFile {
     }
 
     // fclose(file);
-    console.log("load cmdnum = %d,loop count=%d,loaded=%d. %x",fileInfo.cmdNum,loopct,loaded,fileInfo.eKind);
+    console.log("load cmdnum = %d,loop count=%d,loaded=%d. %x", fileInfo.cmdNum, loopct, loaded, fileInfo.eKind);
     return loaded;
   }
 
-  storeFile(fileName){
+  async storeFile(fileName) {
+    const fileBuffer = await new Promise((resolve, reject) => {
+      fs.readFile(__dirname + `/${fileName}`, (err, buf) => {
+        if (err) {
+          console.log('read file ERROR!');
+          reject(err);
+        }
+        resolve(buf);
+      });
+    });
 
+    const fileInfo = FileInfo;
+    let sucCount = 0;
+    fileInfo.etype = (this.applianceType !== null) ? this.applianceType : 0;
+    fileInfo.Manufacturer = (this.manufact !== null) ? this.manufact : 0;
+    fileInfo.model = (this.model !== null) ? this.model : 0;
+    fileInfo.ekind = this.type;
+    if (fileInfo.eKind !== T_AC) {//非红外空调命令
+      fileInfo.cmdHeadSize = 32;
+      fileInfo.cmdSize = fileInfo.cmdHeadSize + 330;
+    } else {
+      fileInfo.cmdHeadSize = 2;
+      fileInfo.cmdSize = fileInfo.cmdHeadSize + 360;
+    }
+
+    //配码命令不需要存储，存储也只会使用其名字
+    if ((fileInfo.eKind & MASK_MASK === MASK_2262)
+        || (fileInfo.eKind & MASK_MASK === MASK_1527)
+        || (fileInfo.eKind & MASK_MASK === MASK_WAVEKC)
+        || (fileInfo.eKind & MASK_MASK === MASK_STATE)) {
+      console.log("Warning:will create rf file %x", fileInfo.eKind);
+      //		finfo.cmdHeadSize = 32;
+      //		finfo.cmdSize = 32;//不需要保存命令码
+    }
+
+    if (typeof creatFile(fileBuffer, fileInfo) !== 'object') {
+      console.log("ERROR: write file error,check file format");
+      return -2;
+    }
+
+    for (let i = 0; i < this.cmds.length; i++) {
+      const cmdInfo = CmdInfo;
+
+      cmdInfo.locale = this.cmds[i].locale;
+      cmdInfo.style = this.cmds[i].style;
+      cmdInfo.key = this.cmds[i].key;
+      cmdInfo.name = (this.cmds[i].name !== null) ? this.cmds[i].name : 0;
+      cmdInfo.length = this.cmds[i].cmd.length;
+
+      if (typeof writeCommand(fileBuffer, fileInfo, cmdInfo, this.cmds[i].cmd) === 'object')
+        sucCount++;
+      else
+        console.log("ERROR write command NO.%d", i);
+    }
+
+    // fclose(file);
+    console.log("store command count = %d", sucCount);
+    return sucCount;
   }
 
   static buildACCKey(mode, onoff, temp, speed) {
@@ -202,16 +259,56 @@ class ConfigFile {
     return 0;
   }
 
-  addCommand(key, Command) {
+  addCommand(key, cmd) {
+    cmd.key = key;
 
+    if (this.type === TYPE_AC) {//是空调命令
+      cmd.name = BasicTypes.GetNameByKey(key);    // 这里有问题？？？？？
+      if (this.map.has(key)) {
+        const index = this.cmds.findIndex(value => value === this.map.get(cmd.key));
+        this.cmds[index] = cmd;
+      } else {
+        this.cmds.push(cmd);
+      }
+      this.map.set(key, cmd);
+      this.map2.set(cmd.name, cmd);
+    } else {
+      if (this.map2.has(cmd.name)) {
+        const index = this.cmds.findIndex(value => value === this.map2.get(cmd.name));
+        this.cmds[index] = cmd;
+      } else {
+        this.cmds.push(cmd);
+      }
+      this.map2.set(cmd.name, cmd);
+    }
+
+    return this.cmds.length;
   }
 
-  delCommand(Command) {
+  delCommand(cmd) {
+    const index = this.cmds.findIndex(value => value === this.map2.get(cmd.name));
+    this.cmds.splice(index, 1);
 
+    if (this.type === TYPE_AC) {
+      this.map.delete(cmd.key);
+      this.map2.delete(cmd.name);
+    } else
+      this.map2.delete(cmd.name);
+
+    return this.cmds.length;
   }
 
   getCommand({key = null, name = null}) {
-
+    //也可以按照index的方式取
+    if (key !== null && name === null) {
+      if (this.map.size === 0 && key < this.cmds.length)
+        return this.cmds[key];
+      return this.map.get(key);
+    } else if (key === null && name !== null) {
+      return this.map2.get(name);
+    } else {
+      return new Error('input error!');
+    }
   }
 }
 

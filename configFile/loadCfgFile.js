@@ -7,10 +7,10 @@
  -5 ：读文件失败
  */
 
-const {FileInfo, CmdInfo, CmdKeyCode, T_AC} = require('./fileTypes');
+const {FileInfo, CmdInfo, CmdKeyCode, TYPE_AC} = require('./fileTypes');
 
 const readFile = (fileBuffer) => {
-  const fileInfo = FileInfo;
+  const fileInfo = new FileInfo();
 
   // 返回-5 ：读文件失败
   if (fileBuffer.byteLength < 8) {
@@ -43,7 +43,7 @@ const readFile = (fileBuffer) => {
 };
 
 const readCommand = (fileBuffer, fileInfo, index) => {
-  const cmdInfo = CmdInfo;
+  const cmdInfo = new CmdInfo();
 
   // 无索引表的情况，目前表示除空调外的其他电器
   if (fileInfo.idxSize === 0) {
@@ -117,7 +117,7 @@ const creatFile = (fileBuffer, fileInfo) => {
   fileInfo.indexOffset = 76;
 
   //如果是空调
-  if (fileInfo.ekind === T_AC) {
+  if (fileInfo.ekind === TYPE_AC) {
     fileInfo.indexAreaSize = 512;
     fileInfo.idxSize = 2;
     writeStr(0xff, fileInfo.indexOffset + 6, fileInfo.indexAreaSize * fileInfo.idxSize, fileBuffer);
@@ -165,7 +165,7 @@ const writeCommand = (fileBuffer, fileInfo, cmdInfo, ptr) => {
   }
 
   // 空调，写索引区
-  if (fileInfo.ekind === T_AC) {
+  if (fileInfo.ekind === TYPE_AC) {
     //首先判断cinfo->key是否越界，正常情况是key 0...511
     if ((cmdInfo.key >= fileInfo.indexAreaSize)) {
       return -1;          // 返回-1 ：写空调命令越界
@@ -192,7 +192,7 @@ const writeCommand = (fileBuffer, fileInfo, cmdInfo, ptr) => {
       cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
     addBuffer.writeInt16BE(cmdInfo.length, 30);
     //保证写满命令项应有的长度
-    writeCmd(ptr, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, addFlieBuffer);
+    writeCmd(ptr, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, addBuffer);
 
     newFileBuffer = Buffer.concat([fileBuffer, addBuffer]);
   }
@@ -202,6 +202,11 @@ const writeCommand = (fileBuffer, fileInfo, cmdInfo, ptr) => {
     fileBuffer: (newFileBuffer === null) ? fileBuffer : newFileBuffer
   }
 };
+
+const buildBOFU = (cmd, aid, i) => {
+
+};
+
 
 const buildACComKey = (mode, onoff, temp, speed) => {
   let accout = 0;
@@ -276,8 +281,8 @@ function writeStr(bufferArr, start, len, fileBuffer) {
 }
 
 function writeCmd(ptr, start, len, fileBuffer) {
-  for (let i = 0; i < len / 4; i++) {
-    fileBuffer.writeInt32BE(ptr, start + i * 4);
+  for (let i = 0; i < len; i++) {
+    fileBuffer.writeInt8(ptr[i], start + i);
   }
   return fileBuffer;
 }
