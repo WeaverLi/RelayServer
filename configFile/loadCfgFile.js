@@ -7,11 +7,9 @@
  -5 ：读文件失败
  */
 
-const {FileInfo, CmdInfo, CmdKeyCode, TYPE_AC} = require('./fileTypes');
+const {FileInfo, TYPE_AC} = require('./fileTypes');
 
-const readFile = (fileBuffer) => {
-  const fileInfo = new FileInfo();
-
+const readFile = (fileBuffer, fileInfo) => {
   // 返回-5 ：读文件失败
   if (fileBuffer.byteLength < 8) {
     return -5;
@@ -39,12 +37,10 @@ const readFile = (fileBuffer) => {
   fileInfo.fileSize = fileBuffer.byteLength;
   fileInfo.cmdNum = (fileInfo.fileSize - fileInfo.cmdOffset) / fileInfo.cmdSize;
 
-  return fileInfo;
+  return 0;
 };
 
-const readCommand = (fileBuffer, fileInfo, index) => {
-  const cmdInfo = new CmdInfo();
-
+const readCommand = (fileBuffer, fileInfo, cmdInfo, index) => {
   // 无索引表的情况，目前表示除空调外的其他电器
   if (fileInfo.idxSize === 0) {
     //判断配置文件是否存储了多于（index+1）条命令,否则index越界
@@ -91,7 +87,7 @@ const readCommand = (fileBuffer, fileInfo, index) => {
     cmdInfo.length = fileBuffer.readInt16BE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 30);
   }
 
-  return cmdInfo;
+  return 0;
 };
 
 const creatFile = (fileBuffer, fileInfo) => {
@@ -100,17 +96,15 @@ const creatFile = (fileBuffer, fileInfo) => {
     return -1;
   }
 
-  //判断是否是已存在的合法文件
-  if (typeof readFile(fileBuffer) === 'object') {
+  const newFileInfo = new FileInfo();
+  //判断是否是已存在的合法文件,是则可能改变fileInfo
+  if (readFile(fileBuffer, newFileInfo) === 0) {
     writeStr(fileInfo.etype, 8, 16, fileBuffer);
     writeStr(fileInfo.Manufacturer, 24, 16, fileBuffer);
     writeStr(fileInfo.model, 40, 32, fileBuffer);
 
-    const newFileInfo = readFile(fileBuffer);
-    return {
-      fileBuffer,
-      fileInfo: newFileInfo
-    }
+    readFile(fileBuffer, fileInfo);
+    return 0;
   }
 
   fileInfo.version = 1;
@@ -153,15 +147,14 @@ const creatFile = (fileBuffer, fileInfo) => {
   fileBuffer.writeInt8(fileInfo.cmdHeadSize, 79);
   fileBuffer.writeInt16BE(fileInfo.cmdSize, 80);
 
-  return {
-    fileBuffer,
-    fileInfo
-  }
+  return 0;
 };
 
-const writeCommand = (fileBuffer, fileInfo, cmdInfo, ptr) => {
+const writeCommand = (fileBuffer, fileInfo, cmdInfo, cmd) => {
   if (fileInfo === null) {
-    const newFileInfo = readFile(fileBuffer);
+    const newFileInfo = new FileInfo();
+    readFile(fileBuffer, newFileInfo);
+    fileInfo = newFileInfo;
   }
 
   // 空调，写索引区
@@ -192,19 +185,56 @@ const writeCommand = (fileBuffer, fileInfo, cmdInfo, ptr) => {
       cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
     addBuffer.writeInt16BE(cmdInfo.length, 30);
     //保证写满命令项应有的长度
-    writeCmd(ptr, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, addBuffer);
+    writeCmd(cmd, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, addBuffer);
 
     newFileBuffer = Buffer.concat([fileBuffer, addBuffer]);
   }
 
   return {
-    fileInfo,
+    state: 0,
     fileBuffer: (newFileBuffer === null) ? fileBuffer : newFileBuffer
   }
 };
 
 const buildBOFU = (cmd, aid, i) => {
+  const tmp = [];
+  const action = [0x43, 0x13, 0x53, 0xc3];                 //第3字节动作码（通道1）：配码0100，开0001，停0101，关1100
 
+  if (i < 0 || i > 4)									//自定义4个命令，依次为：配码，开，停，关
+    return 0;
+  tmp[0] = (aid & 0xff);
+  tmp[1] = (aid & 0xff00) >> 8;
+  tmp[2] = action[i];
+  tmp[3] = 0x01;									  //模拟BF-101发射器
+  tmp[4] = 1 - (tmp[0] + tmp[1] + tmp[2] + tmp[3]); //校验
+                                                    //将5字节编为波形
+  cmd.writeInt8(8, 0);
+  cmd.writeInt8(20, 1);
+  cmd.writeInt8(100, 4);
+  cmd.writeInt8(100, 5);
+  cmd.writeInt8(100, 6);
+  cmd.writeInt8(100 | 0x80, 7);
+  cmd.writeInt8(50 | 0x80, 8);
+  cmd.writeInt8(100, 9);
+  cmd.writeInt8(20 | 0x80, 10);
+
+  // 5个8字节，bofu的先发低位   //80字节
+  for (let j = 0; j < 5; j++) {
+    let high = tmp[j];
+    for (let k = 0; k < 8; k++) {
+      if (high & 0x01) {
+        cmd.writeInt8(33, j * 8 * 2 + k * 2 + 1);
+        cmd.writeInt8(17 | 0x80, j * 8 * 2 + k * 2 + 2);
+      } else {
+        cmd.writeInt8(17, j * 8 * 2 + k * 2 + 1);
+        cmd.writeInt8(33 | 0x80, j * 8 * 2 + k * 2 + 2);
+      }
+      high >>= 1;
+    }
+  }
+
+  cmd.writeInt8(20, 91);
+  return (5 * 16 + 8) + 4;            // 92
 };
 
 
@@ -232,10 +262,6 @@ const buildACComKey = (mode, onoff, temp, speed) => {
 };
 
 const buildTwaveKey = (type, intval, repeat) => {
-  // const cmdKeyCode = CmdKeyCode;
-  // cmdKeyCode.type=type;        //5bit
-  // cmdKeyCode.count=repeat;     //3bit
-  // cmdKeyCode.intval=intval;    //8bit
   let accout = 0x0000;
   accout |= type << 11;
   accout |= repeat << 8;
@@ -266,16 +292,20 @@ const getFanByACCKey = key => {
 
 // 辅助函数
 function readStr(fileBuffer, start, len) {
-  const Arr = [];
+  const Arr = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
-    Arr.push(fileBuffer.readInt8(start + i));
+    Arr[i] = fileBuffer.readInt8(start + i);
   }
   return Arr;
 }
 
-function writeStr(bufferArr, start, len, fileBuffer) {
-  for (let i = 0; i < len; i++) {
-    fileBuffer.writeInt8(bufferArr[i], start + i);
+function writeStr(uint8Arr, start, len, fileBuffer) {
+  if (typeof uint8Arr === 'object') {
+    for (let i = 0; i < len; i++)
+      fileBuffer.writeInt8(uint8Arr[i], start + i);
+  } else if (typeof uint8Arr === 'number') {
+    for (let i = 0; i < len; i++)
+      fileBuffer.writeInt8(uint8Arr, start + i);
   }
   return fileBuffer;
 }
@@ -292,6 +322,7 @@ module.exports = {
   readCommand,         // readCommand(fileBuffer,fileInfo,index); 参数index为，返回成功为cmdInfo,失败为错误码
   creatFile,           // creatFile(fileBuffer,fileInfo); 参数，返回成功为fileBuffer,fileInfo,失败为错误码
   writeCommand,        // writeCommand(fileBuffer,fileInfo,cmdInfo,ptr); 参数ptr为，返回成功为fileBuffer,fileInfo,失败为错误码
+  buildBOFU,           // buildBOFU(cmd,aid,i);参数cmd为Buffer,返回成功为92（cmd的92字节处）,失败为错误码
   buildACComKey,       // buildACComKey(mode, onoff, temp, speed);参数,返回为accout
   buildTwaveKey,       // buildTwaveKey(type, intval, repeat);参数，返回accout
   getModeByACCKey,

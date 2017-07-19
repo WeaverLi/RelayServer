@@ -26,11 +26,11 @@ function FileInfo() {
   this.ekind = 0;                   //格式的命令类型和面板类型，1字节见EKIND结构
   this.indexOffset = 0;             //索引区偏移，2字节，固定填76：0x4c00
   this.cmdOffset = 0;               //命令区偏移，2字节，一般82（FileInfo＋）：0x5200
-  this.headCRC = 0;                     //头部CRC校验，2字节，暂时填固定值 0x5555
+  this.headCRC = 0;                 //头部CRC校验，2字节，暂时填固定值 0x5555
   //@ 8byte
-  this.etype = [];               //电器类型，16字节，UTF-8编码，4汉字
-  this.Manufacturer = [];        //厂家，16字节，UTF-8编码，4汉字
-  this.model = [];               //电器型号，32字节
+  this.etype = new Uint8Array(16);                  //电器类型，16字节，UTF-8编码，4汉字
+  this.Manufacturer = new Uint8Array(16);           //厂家，16字节，UTF-8编码，4汉字
+  this.model = new Uint8Array(32);                  //电器型号，32字节
   //@ 72byte
   this.panelHeight = 0;             //面板区高度，2字节
   this.panelWidth = 0;              //面板区宽度，2字节
@@ -40,31 +40,40 @@ function FileInfo() {
   this.idxSize = 0;                 //索引表项大小，2或0
   this.cmdHeadSize = 0;             //命令头大小，2或32： 0x20
   //@ 80byte
-  this.cmdSize = 0;                //命令项大小（一般为160+32:0xc000，空调为160+2:0xa200， 对于要生成码的也用192），每个命令项大小相同，用于连续计算命令码的偏移，码实际长度可以不同。
-  this.fileSize = 0;                 //这个也是算出来的，不用写在文件里面
+  this.cmdSize = 0;                 //命令项大小（一般为160+32:0xc000，空调为160+2:0xa200， 对于要生成码的也用192），每个命令项大小相同，用于连续计算命令码的偏移，码实际长度可以不同。
+  this.fileSize = 0;                //这个也是算出来的，不用写在文件里面
   // @ 82byte
 }
 
 function CmdInfo() {
-  this.length = 0;
-  this.key = 0;                         //空调IR的key；TWAVE用来存重复次数和T单位(us)，见CmdKeyCode结构；
-  this.offset = 0;                      //文件中的偏移
-  this.name = [];
-  this.locale = 0;
-  this.style = 0
+  this.length = 0;                   // 2字节
+  this.key = 0;                      // 2字节,空调IR的key；TWAVE用来存重复次数和T单位(us)，见CmdKeyCode结构；
+  this.offset = 0;                   // 4字节,文件中的偏移
+  this.name = new Uint8Array(20);    // 20字节 char[20]
+  this.locale = 0;                   // 4字节
+  this.style = 0                     // 4字节
 }
+/*文件中实际32字节顺序：{
+ unsigned int locale;//固定0
+ unsigned int style;//固定0
+ unsigned short keycode;//keycode。默认0
+ char name[20];
+ unsigned short length;//实际长度，一般为160
+ }
+ */
 
+// CmdInfo中的key结构，2字节
 function CmdKeyCode() {
-  this.type = 0;
-  this.count = 0;
-  this.intval = 0;
+  this.type = 0;                     // 5位,类型，对应厂家的编码方式
+  this.count = 0;                    // 3位,重复发送次数
+  this.intval = 0;                   // 1字节,波形记录的时间单位
 }
 
+// FileInfo的ekind结构，1字节
 function EKIND() {
-  this.mask = 0;                 // 高3位表示命令类型，000红外学习，001：时间波形，010：1527配码，011:2262配码，
-  this.type = 0;                 //低5位表示面板类型,00000：自定义
+  this.mask = 0;                     // 高3位表示命令类型，000红外学习，001：时间波形，010：1527配码，011:2262配码，
+  this.type = 0;                     //低5位表示面板类型,00000：自定义
 }
-
 
 module.exports = {
   FileInfo,

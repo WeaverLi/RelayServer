@@ -2,13 +2,14 @@ const fs = require('fs');
 const path = require('path');
 
 const Command = require('./command');
-const {FileInfo, CmdInfo} = require('./fileTypes');
+const {FileInfo, CmdInfo, TYPE_AC} = require('./fileTypes');
 
 const {
   readFile,
   readCommand,
   creatFile,
   writeCommand,
+  buildBOFU,
   buildACComKey,
   buildTwaveKey,
   getModeByACCKey,
@@ -18,47 +19,57 @@ const {
 
 class ConfigFile {
   constructor(aid) {
-    this.type = 0;    //0自定义
-    this.aid = aid;   //所属电器id，对无线命令码的生成有作用
-
-    this.cmds = [];   // cmds = new ArrayList<Command>();
-    this.map = new Map();
-    this.map2 = new Map();
-
+    this.aid = aid;                //所属电器id，对无线命令码的生成有作用
+    this.type = 0;                 //0自定义
     this.applianceType = '';
     this.manufact = '';
     this.model = '';
+
+    this.cmds = [];                // cmds = new ArrayList<Command>();
+    this.map = new Map();
+    this.map2 = new Map();
   }
 
   async loadFile(fileName) {
+    const fileInfo = new FileInfo();
     const fileBuffer = await new Promise((resolve, reject) => {
       fs.readFile(__dirname + `/${fileName}`, (err, buf) => {
         if (err) {
-          console.log('read file ERROR!');
-          reject(err);
+          console.log('read file ERROR!',err);
+          reject(-1);
         }
         resolve(buf);
       });
     });
 
-    const fileInfo = readFile(fileBuffer);
+    // 解析文件并给属性赋值
+    const ret=readFile(fileBuffer, fileInfo);
+    if (ret !== 0 || fileInfo.cmdNum < 0)
+    {
+      console.log("indexoffset %u ret %d fileInfo.cmdNum %u", fileInfo.indexOffset, ret, fileInfo.cmdNum);
+      console.log("ERROR: read file error,check file format");
+      return -2;
+    }
     this.type = fileInfo.ekind;
     this.applianceType = fileInfo.etype;
     this.manufact = fileInfo.Manufacturer;
     this.model = fileInfo.model;
 
     //获得循环次数
-    const loopct = (fileInfo.ekind === T_AC) ? fileInfo.indexAreaSize : fileInfo.cmdNum;
+    const loopct = (fileInfo.ekind === TYPE_AC) ? fileInfo.indexAreaSize : fileInfo.cmdNum;
     let loaded = 0;
 
+    // 解析命令并给属性赋值
     for (let i = 0; i < loopct; i++) {
-      const cmdInfo = readCommand(fileBuffer, fileInfo, i);
+      const cmdInfo=new CmdInfo();
+      const error=readCommand(fileBuffer, fileInfo,cmdInfo, i);
+
       //不允许length越界的情况
-      if (cmdInfo !== 'object') {
-        if (fileInfo.eKind !== T_AC)
-          console.log("cmd NO.%d error = %d,lenth=%d, filesize =%d, cmdoff=%d", i, cmdInfo, cmdInfo.length, fileInfo.cmdSize, cmdInfo.offset);
+      if (error<0) {
+        if (fileInfo.eKind !== TYPE_AC)
+          console.log("cmd NO.%d error = %d,lenth=%d, filesize =%d, cmdoff=%d", i, error, cmdInfo.length, fileInfo.cmdSize, cmdInfo.offset);
         else
-          console.log("AC cmd %d error = %d,clenth=%d, cmdSize =%d, cmdoff=%d", i, cmdInfo, cmdInfo.length, fileInfo.cmdSize, cmdInfo.offset);
+          console.log("AC cmd %d error = %d,clenth=%d, cmdSize =%d, cmdoff=%d", i, error, cmdInfo.length, fileInfo.cmdSize, cmdInfo.offset);
       }
       if (cmdInfo.length > fileInfo.cmdSize - fileInfo.cmdHeadSize)
         cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
@@ -81,17 +92,14 @@ class ConfigFile {
       }
       else if ((fileInfo.eKind & MASK_MASK) === MASK_WAVEKC) {//根据aid和命令的keycode决定如何生成命令，文件内容无意义
         //前4个字节在文件中应该也有，可以读4个字节，也可以根据key重新生成。
-        cmdInfo.length = 4;//MASK_TWAVE命令前四个字节为发送方式
-        CmdKeyCode * kc = (CmdKeyCode *)( & cinfo.key
-      )
-        ;
-        tmp[0] = kc->count;//发几轮，默认1
-        tmp[1] = kc->intval;//时间长度单位，默认20us。
+        cmdInfo.length = 4;             //MASK_TWAVE命令前四个字节为发送方式
+        tmp[0] = cmdInfo.key.count;     //发几轮，默认1
+        tmp[1] = cmdInfo.key.intval;    //时间长度单位，默认20us。
         tmp[2] = 0;
         tmp[3] = 0;//保留，对齐。
 
         //根据厂家开始生成波形，模块直接发送。
-        if (kc->type === CMD_KEYCODE_BOFU)
+        if (cmdInfo.key.type === CMD_KEYCODE_BOFU)
           cmdInfo.length = buildBOFU(tmp, this.aid, i);
 
         //不支持的直接返回4，模块不会处理，app可以提示不支持
