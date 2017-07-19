@@ -1,13 +1,13 @@
 class Command {
-  constructor({name, cmd,style,locate}) {
+  constructor({name, cmd, style, locate}) {
     this.location = locate;
     this.style = style;
-    this.name = name;
+    this.name = name;   // Uint8Array(20)
     this.cmd = cmd;  // []
     this.key = 0;
   }
 
-  getCmds(){
+  getCmds() {
     return this.cmd;
   }
 

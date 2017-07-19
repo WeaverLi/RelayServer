@@ -2,7 +2,19 @@ const fs = require('fs');
 const path = require('path');
 
 const Command = require('./command');
-const {FileInfo, CmdInfo, TYPE_AC} = require('./fileTypes');
+const {
+  FileInfo,
+  CmdInfo,
+  TYPE_AC,
+  CMD_KEYCODE_BOFU,
+  MASK_MASK,
+  MASK_IR,
+  MASK_WAVEKC,
+  MASK_2262,
+  MASK_1527,
+  MASK_WAVE,
+  MASK_STATE
+} = require('./fileTypes');
 
 const {
   readFile,
@@ -18,14 +30,14 @@ const {
 } = require('./loadCfgFile');
 
 class ConfigFile {
-  constructor(aid) {
+  constructor({aid, type, applianceType, manufact, model, cmd}) {
     this.aid = aid;                //所属电器id，对无线命令码的生成有作用
-    this.type = 0;                 //0自定义
-    this.applianceType = '';
-    this.manufact = '';
-    this.model = '';
+    this.type = type || 0;                 //0自定义
+    this.applianceType = applianceType || '';
+    this.manufact = manufact || '';
+    this.model = model || '';
 
-    this.cmds = [];                // cmds = new ArrayList<Command>();
+    this.cmds = cmd || [];                // cmds = new ArrayList<Command>();
     this.map = new Map();
     this.map2 = new Map();
   }
@@ -35,7 +47,7 @@ class ConfigFile {
     const fileBuffer = await new Promise((resolve, reject) => {
       fs.readFile(__dirname + `/${fileName}`, (err, buf) => {
         if (err) {
-          console.log('read file ERROR!',err);
+          console.log('read file ERROR!', err);
           reject(-1);
         }
         resolve(buf);
@@ -43,9 +55,8 @@ class ConfigFile {
     });
 
     // 解析文件并给属性赋值
-    const ret=readFile(fileBuffer, fileInfo);
-    if (ret !== 0 || fileInfo.cmdNum < 0)
-    {
+    const ret = readFile(fileBuffer, fileInfo);
+    if (ret !== 0 || fileInfo.cmdNum < 0) {
       console.log("indexoffset %u ret %d fileInfo.cmdNum %u", fileInfo.indexOffset, ret, fileInfo.cmdNum);
       console.log("ERROR: read file error,check file format");
       return -2;
@@ -61,11 +72,11 @@ class ConfigFile {
 
     // 解析命令并给属性赋值
     for (let i = 0; i < loopct; i++) {
-      const cmdInfo=new CmdInfo();
-      const error=readCommand(fileBuffer, fileInfo,cmdInfo, i);
+      const cmdInfo = new CmdInfo();
+      const error = readCommand(fileBuffer, fileInfo, cmdInfo, i);
 
       //不允许length越界的情况
-      if (error<0) {
+      if (error < 0) {
         if (fileInfo.eKind !== TYPE_AC)
           console.log("cmd NO.%d error = %d,lenth=%d, filesize =%d, cmdoff=%d", i, error, cmdInfo.length, fileInfo.cmdSize, cmdInfo.offset);
         else
@@ -78,38 +89,34 @@ class ConfigFile {
       let rf = 1;//是否重新创建命令，0表示直接读取文件中的命令码
       if ((fileInfo.eKind & MASK_MASK) === MASK_2262) {// 生成12个2bit，存到12字节中，文件内容无意义
         cmdInfo.length = 12;
-        const rfcode = (this.aid & 0xfffff);//取20bit
+        const rfcode = (this.aid & 0xfffff);       //取20bit
         for (let j = 0; j < 10; j++)
-          tmp[j] = (rfcode & (0x03 << j)) >> j;
-        tmp[10] = i % 3;//0,1,2
-        tmp[11] = i / 3;//0,1,2
+          tmp.writeUInt8((rfcode & (0x03 << j)) >> j, j);
+        tmp.writeUInt8(i % 3, 10);
+        tmp.writeUInt8(i / 3, 11);
       }
-      else if ((fileInfo.eKind & MASK_MASK) === MASK_1527) {// 生成24个1bit，存到24字节中，文件内容无意义
+      else if ((fileInfo.eKind & MASK_MASK) === MASK_1527) {      // 生成24个1bit，存到24字节中，文件内容无意义
         cmdInfo.length = 24;
-        const rfcode = (this.aid & 0x1fffff) | ((i + 1) << 21);//取21bit,i的3bit最多8个命令
+        const rfcode = (this.aid & 0x1fffff) | ((i + 1) << 21);   //取21bit,i的3bit最多8个命令
         for (let j = 0; j < 24; j++)
-          tmp[j] = (rfcode & (1 << j)) >> j;
+          tmp.writeUInt8((rfcode & (1 << j)) >> j, j);
       }
       else if ((fileInfo.eKind & MASK_MASK) === MASK_WAVEKC) {//根据aid和命令的keycode决定如何生成命令，文件内容无意义
         //前4个字节在文件中应该也有，可以读4个字节，也可以根据key重新生成。
         cmdInfo.length = 4;             //MASK_TWAVE命令前四个字节为发送方式
-        tmp[0] = cmdInfo.key.count;     //发几轮，默认1
-        tmp[1] = cmdInfo.key.intval;    //时间长度单位，默认20us。
-        tmp[2] = 0;
-        tmp[3] = 0;//保留，对齐。
+        tmp.writeUInt8(cmdInfo.key.count, 0);//发几轮，默认1
+        tmp.writeUInt8(cmdInfo.key.intval, 1);//时间长度单位，默认20us。
+        tmp.writeUInt16BE(0, 2);
 
         //根据厂家开始生成波形，模块直接发送。
         if (cmdInfo.key.type === CMD_KEYCODE_BOFU)
           cmdInfo.length = buildBOFU(tmp, this.aid, i);
-
         //不支持的直接返回4，模块不会处理，app可以提示不支持
       }
       else if ((fileInfo.eKind & MASK_MASK) === MASK_STATE) {//状态命令
         cmdInfo.length = 4;//取得key即可，无需读取文件
-        tmp[0] = cmdInfo.key;//状态码，发给设备
-        tmp[1] = 0;
-        tmp[2] = 0;
-        tmp[3] = 0;//保留，对齐。
+        tmp.writeUInt8(cmdInfo.key, 0);//状态码，发给设备
+        tmp.writeUIntBE(0, 1, 3);
 
         rf = 0;//还是读文件吧，将忽略上面的tmp
       }
@@ -127,10 +134,10 @@ class ConfigFile {
       else { //创建命令
         cmdBuffer = tmp.readUIntBE(0, cmdInfo.length);
       }
-      cmdArr = new Uint8Array(cmdBuffer);
 
+      cmdArr = new Uint8Array(cmdBuffer);
       const command = new Command({
-        name: cmdInfo.name,
+        name: (cmdInfo.name[0] !== 0) ? cmdInfo.name : new Uint8Array(20),
         locate: cmdInfo.locate,
         style: cmdInfo.style,
         cmd: cmdArr
@@ -140,24 +147,24 @@ class ConfigFile {
       loaded++;
     }
 
-    // fclose(file);
     console.log("load cmdnum = %d,loop count=%d,loaded=%d. %x", fileInfo.cmdNum, loopct, loaded, fileInfo.eKind);
     return loaded;
   }
 
   async storeFile(fileName) {
-    const fileBuffer = await new Promise((resolve, reject) => {
+    const fileInfo = new FileInfo();
+    let sucCount = 0;
+
+    await new Promise((resolve, reject) => {
       fs.readFile(__dirname + `/${fileName}`, (err, buf) => {
         if (err) {
-          console.log('read file ERROR!');
-          reject(err);
+          console.log('read file ERROR!', err);
+          reject(-1);
         }
-        resolve(buf);
+        resolve(0);
       });
     });
 
-    const fileInfo = FileInfo;
-    let sucCount = 0;
     fileInfo.etype = (this.applianceType !== null) ? this.applianceType : 0;
     fileInfo.Manufacturer = (this.manufact !== null) ? this.manufact : 0;
     fileInfo.model = (this.model !== null) ? this.model : 0;
@@ -165,7 +172,8 @@ class ConfigFile {
     if (fileInfo.eKind !== T_AC) {//非红外空调命令
       fileInfo.cmdHeadSize = 32;
       fileInfo.cmdSize = fileInfo.cmdHeadSize + 330;
-    } else {
+    }
+    else {
       fileInfo.cmdHeadSize = 2;
       fileInfo.cmdSize = fileInfo.cmdHeadSize + 360;
     }
@@ -180,13 +188,13 @@ class ConfigFile {
       //		finfo.cmdSize = 32;//不需要保存命令码
     }
 
-    if (typeof creatFile(fileBuffer, fileInfo) !== 'object') {
+    if (creatFile(fileBuffer, fileInfo) < 0) {
       console.log("ERROR: write file error,check file format");
       return -2;
     }
 
     for (let i = 0; i < this.cmds.length; i++) {
-      const cmdInfo = CmdInfo;
+      const cmdInfo = new CmdInfo();
 
       cmdInfo.locale = this.cmds[i].locale;
       cmdInfo.style = this.cmds[i].style;
@@ -194,13 +202,12 @@ class ConfigFile {
       cmdInfo.name = (this.cmds[i].name !== null) ? this.cmds[i].name : 0;
       cmdInfo.length = this.cmds[i].cmd.length;
 
-      if (typeof writeCommand(fileBuffer, fileInfo, cmdInfo, this.cmds[i].cmd) === 'object')
+      if (writeCommand(fileBuffer, fileInfo, cmdInfo, this.cmds[i].cmd) >= 0)
         sucCount++;
       else
         console.log("ERROR write command NO.%d", i);
     }
 
-    // fclose(file);
     console.log("store command count = %d", sucCount);
     return sucCount;
   }
@@ -275,16 +282,19 @@ class ConfigFile {
       if (this.map.has(key)) {
         const index = this.cmds.findIndex(value => value === this.map.get(cmd.key));
         this.cmds[index] = cmd;
-      } else {
+      }
+      else {
         this.cmds.push(cmd);
       }
       this.map.set(key, cmd);
       this.map2.set(cmd.name, cmd);
-    } else {
+    }
+    else {
       if (this.map2.has(cmd.name)) {
         const index = this.cmds.findIndex(value => value === this.map2.get(cmd.name));
         this.cmds[index] = cmd;
-      } else {
+      }
+      else {
         this.cmds.push(cmd);
       }
       this.map2.set(cmd.name, cmd);
@@ -300,7 +310,8 @@ class ConfigFile {
     if (this.type === TYPE_AC) {
       this.map.delete(cmd.key);
       this.map2.delete(cmd.name);
-    } else
+    }
+    else
       this.map2.delete(cmd.name);
 
     return this.cmds.length;
@@ -312,9 +323,11 @@ class ConfigFile {
       if (this.map.size === 0 && key < this.cmds.length)
         return this.cmds[key];
       return this.map.get(key);
-    } else if (key === null && name !== null) {
+    }
+    else if (key === null && name !== null) {
       return this.map2.get(name);
-    } else {
+    }
+    else {
       return new Error('input error!');
     }
   }

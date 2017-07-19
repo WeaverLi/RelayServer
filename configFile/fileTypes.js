@@ -80,5 +80,13 @@ module.exports = {
   CmdInfo,
   CmdKeyCode,
   EKIND,
-  TYPE_AC
+  TYPE_AC,
+  CMD_KEYCODE_BOFU,
+  MASK_MASK,
+  MASK_IR,
+  MASK_WAVEKC,
+  MASK_2262,
+  MASK_1527,
+  MASK_WAVE,
+  MASK_STATE
 };
