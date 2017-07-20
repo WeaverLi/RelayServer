@@ -6,20 +6,21 @@
  -4 ：命令偏移越界
  -5 ：读文件失败
  */
-
+const fs = require('fs');
 const {FileInfo, TYPE_AC} = require('./fileTypes');
 
-const readFile = (fileBuffer, fileInfo) => {
+const readFile = (fd, fileInfo) => {
+  const fileBuffer = fs.readFileSync(fd);
   // 返回-5 ：读文件失败
   if (fileBuffer.byteLength < 8) {
     return -5;
   }
 
-  fileInfo.version = fileBuffer.readInt8(0);
-  fileInfo.ekind = fileBuffer.readInt8(1);
-  fileInfo.indexOffset = fileBuffer.readInt16BE(2);
-  fileInfo.cmdOffset = fileBuffer.readInt16BE(4);
-  fileInfo.headCRC = fileBuffer.readInt16BE(6);
+  fileInfo.version = fileBuffer.readUInt8(0);
+  fileInfo.ekind = fileBuffer.readUInt8(1);
+  fileInfo.indexOffset = fileBuffer.readUInt16LE(2);
+  fileInfo.cmdOffset = fileBuffer.readUInt16LE(4);
+  fileInfo.headCRC = fileBuffer.readUInt16LE(6);
 
   fileInfo.etype = readStr(fileBuffer, 8, 16);
   fileInfo.Manufacturer = readStr(fileBuffer, 24, 16);
@@ -28,11 +29,11 @@ const readFile = (fileBuffer, fileInfo) => {
   // fileInfo.panelHeight = fileBuffer.getUint16(72);
   // fileInfo.panelWidth = fileBuffer.getUint16(74);
 
-  fileInfo.indexAreaSize = fileBuffer.readInt16BE(fileInfo.indexOffset);
-  fileInfo.idxSize = fileBuffer.readInt16BE(fileInfo.indexOffset + 2);
-  fileInfo.cmdHeadSize = fileBuffer.readInt8(fileInfo.indexOffset + 1);
+  fileInfo.indexAreaSize = fileBuffer.readUInt16LE(fileInfo.indexOffset);
+  fileInfo.idxSize = fileBuffer.readUInt16LE(fileInfo.indexOffset + 2);
+  fileInfo.cmdHeadSize = fileBuffer.readUInt8(fileInfo.indexOffset + 1);
 
-  fileInfo.cmdSize = fileBuffer.readInt16BE(fileInfo.indexOffset + 1);
+  fileInfo.cmdSize = fileBuffer.readUInt16LE(fileInfo.indexOffset + 1);
 
   fileInfo.fileSize = fileBuffer.byteLength;
   fileInfo.cmdNum = (fileInfo.fileSize - fileInfo.cmdOffset) / fileInfo.cmdSize;
@@ -40,7 +41,9 @@ const readFile = (fileBuffer, fileInfo) => {
   return 0;
 };
 
-const readCommand = (fileBuffer, fileInfo, cmdInfo, index) => {
+const readCommand = (fd, fileInfo, cmdInfo, index) => {
+  const fileBuffer = fs.readFileSync(fd);
+
   // 无索引表的情况，目前表示除空调外的其他电器
   if (fileInfo.idxSize === 0) {
     //判断配置文件是否存储了多于（index+1）条命令,否则index越界
@@ -66,7 +69,7 @@ const readCommand = (fileBuffer, fileInfo, cmdInfo, index) => {
   }
   //有索引表的情况，目前就是空调
   else if (fileInfo.idxSize === 2) {
-    const realIndexAreaSize = (fileInfo.cmdOffset - fileInfo.indexOffset - 6) / fileInfo.idxSize;
+    // const realIndexAreaSize = (fileInfo.cmdOffset - fileInfo.indexOffset - 6) / fileInfo.idxSize;
     const content = fileBuffer.readInt16BE(fileInfo.indexOffset + 6 + index * 2);
     if (content === 0xffff) return -1;
 
@@ -90,7 +93,7 @@ const readCommand = (fileBuffer, fileInfo, cmdInfo, index) => {
   return 0;
 };
 
-const creatFile = (fileBuffer, fileInfo) => {
+const creatFile = (fd, fileInfo) => {
   //在外面先打开文件*file，如果不存在，则新建文件
   if (fileInfo === null) {
     return -1;
@@ -98,12 +101,12 @@ const creatFile = (fileBuffer, fileInfo) => {
 
   const newFileInfo = new FileInfo();
   //判断是否是已存在的合法文件,是则可能改变fileInfo
-  if (readFile(fileBuffer, newFileInfo) === 0) {
-    writeStr(fileInfo.etype, 8, 16, fileBuffer);
-    writeStr(fileInfo.Manufacturer, 24, 16, fileBuffer);
-    writeStr(fileInfo.model, 40, 32, fileBuffer);
+  if (readFile(fd, newFileInfo) === 0) {
+    fs.writeSync(fd, fileInfo.etype, 0, 16, 8);
+    fs.writeSync(fd, fileInfo.Manufacturer, 0, 16, 24);
+    fs.writeSync(fd, fileInfo.model, 0, 32, 40);
 
-    readFile(fileBuffer, fileInfo);
+    readFile(fd, fileInfo);
     return 0;
   }
 
@@ -114,7 +117,7 @@ const creatFile = (fileBuffer, fileInfo) => {
   if (fileInfo.ekind === TYPE_AC) {
     fileInfo.indexAreaSize = 512;
     fileInfo.idxSize = 2;
-    writeStr(0xff, fileInfo.indexOffset + 6, fileInfo.indexAreaSize * fileInfo.idxSize, fileBuffer);
+    fs.writeSync(fd, Buffer.alloc(fileInfo.indexAreaSize * fileInfo.idxSize, 0xff), 0, fileInfo.indexAreaSize * fileInfo.idxSize, fileInfo.indexOffset + 6);
   }
   // 其它电器
   else {
@@ -129,31 +132,33 @@ const creatFile = (fileBuffer, fileInfo) => {
   fileInfo.panelHeight = 2;
 
   // 写文件
-  fileBuffer.writeInt8(fileInfo.version, 0);
-  fileBuffer.writeInt8(fileInfo.ekind, 1);
-  fileBuffer.writeInt16BE(fileInfo.indexOffset, 2);
-  fileBuffer.writeInt16BE(fileInfo.cmdOffset, 4);
-  fileBuffer.writeInt16BE(fileInfo.headCRC, 6);
+  const headBuffer = Buffer.alloc(82);
+  headBuffer.writeUInt8(fileInfo.version, 0);
+  headBuffer.writeUInt8(fileInfo.ekind, 1);
+  headBuffer.writeUInt16BE(fileInfo.indexOffset, 2);
+  headBuffer.writeUInt16BE(fileInfo.cmdOffset, 4);
+  headBuffer.writeUInt16BE(fileInfo.headCRC, 6);
 
-  writeStr(fileInfo.etype, 8, 16, fileBuffer);
-  writeStr(fileInfo.Manufacturer, 24, 16, fileBuffer);
-  writeStr(fileInfo.model, 40, 32, fileBuffer);
+  writeStr(fileInfo.etype, 8, 16, headBuffer);
+  writeStr(fileInfo.Manufacturer, 24, 16, headBuffer);
+  writeStr(fileInfo.model, 40, 32, headBuffer);
 
-  fileBuffer.writeInt16BE(fileInfo.panelHeight, 72);
-  fileBuffer.writeInt16BE(fileInfo.panelWidth, 74);
+  headBuffer.writeUInt16BE(fileInfo.panelHeight, 72);
+  headBuffer.writeUInt16BE(fileInfo.panelWidth, 74);
 
-  fileBuffer.writeInt16BE(fileInfo.indexAreaSize, 76);
-  fileBuffer.writeInt8(fileInfo.idxSize, 78);
-  fileBuffer.writeInt8(fileInfo.cmdHeadSize, 79);
-  fileBuffer.writeInt16BE(fileInfo.cmdSize, 80);
+  headBuffer.writeUInt16BE(fileInfo.indexAreaSize, 76);
+  headBuffer.writeUInt8(fileInfo.idxSize, 78);
+  headBuffer.writeUInt8(fileInfo.cmdHeadSize, 79);
+  headBuffer.writeUInt16BE(fileInfo.cmdSize, 80);
 
+  fs.writeSync(fd, headBuffer, 0, 82, 0);
   return 0;
 };
 
-const writeCommand = (fileBuffer, fileInfo, cmdInfo, cmd) => {
+const writeCommand = (fd, fileInfo, cmdInfo, cmd) => {
   if (fileInfo === null) {
     const newFileInfo = new FileInfo();
-    readFile(fileBuffer, newFileInfo);
+    readFile(fd, newFileInfo);
     fileInfo = newFileInfo;
   }
 
@@ -165,36 +170,44 @@ const writeCommand = (fileBuffer, fileInfo, cmdInfo, cmd) => {
     }
     let tmp = 0;
     for (let i = 0; i < fileInfo.indexAreaSize; i++) {
-      const bh = fileBuffer.readInt16BE(fileInfo.indexOffset + 6 + i * 2);
-      if (((bh + 1) > tmp) && (bh !== 0xffff)) {
-        tmp = bh + 1;
+      const bh = Buffer.alloc(2);
+      fs.readSync(fd, bh, 0, 2, fileInfo.indexOffset + 6 + i * 2);
+      if (((bh.readUInt16BE(0) + 1) > tmp) && (bh.readUInt16BE(0) !== 0xffff)) {
+        tmp = bh.readUInt16BE(0) + 1;
       }
     }
 
-    fileBuffer.writeInt16BE(tmp, fileInfo.indexOffset + 6 + cmdInfo.key * 2);
+    fs.writeSync(fd, tmp, 0, 2, fileInfo.indexOffset + 6 + cmdInfo.key * 2);
   }
 
-  let newFileBuffer = null;
+  const appendBuffer1 = Buffer.alloc(32 + fileInfo.cmdSize - fileInfo.cmdHeadSize);
+  const appendBuffer2 = Buffer.alloc(2 + fileInfo.cmdSize - fileInfo.cmdHeadSize);
+
   if (fileInfo.cmdHeadSize === 32) {
-    const addBuffer = Buffer.alloc(32 + fileInfo.cmdSize - fileInfo.cmdHeadSize);
-    addBuffer.writeInt32BE(cmdInfo.locale, 0);
-    addBuffer.writeInt32BE(cmdInfo.style, 4);
-    addBuffer.writeInt16BE(cmdInfo.key, 8);
-    writeStr(cmdInfo.name, 10, 20, addBuffer);
+    appendBuffer1.writeUInt32BE(cmdInfo.locale, 0);
+    appendBuffer1.writeUInt32BE(cmdInfo.style, 4);
+    appendBuffer1.writeUInt16BE(cmdInfo.key, 8);
+    writeStr(cmdInfo.name, 10, 20, appendBuffer1);
     if (cmdInfo.length > fileInfo.cmdSize - fileInfo.cmdHeadSize)
       cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
-    addBuffer.writeInt16BE(cmdInfo.length, 30);
+    appendBuffer1.writeUInt16BE(cmdInfo.length, 30);
     //保证写满命令项应有的长度
-    writeCmd(cmd, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, addBuffer);
+    writeCmd(cmd, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, appendBuffer1);
 
-    newFileBuffer = Buffer.concat([fileBuffer, addBuffer]);
+    fs.appendFileSync(fd, appendBuffer1);
+  } else {
+    if (cmdInfo.length > fileInfo.cmdSize - fileInfo.cmdHeadSize)
+      cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
+    appendBuffer2.writeUInt16BE(cmdInfo.length, 0);
+    //保证写满命令项应有的长度
+    writeCmd(cmd, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, appendBuffer2);
+
+    fs.appendFileSync(fd, appendBuffer2);
   }
 
-  return {
-    state: 0,
-    fileBuffer: (newFileBuffer === null) ? fileBuffer : newFileBuffer
-  }
+  return 0;
 };
+
 
 const buildBOFU = (cmd, aid, i) => {
   const tmp = [];
@@ -294,25 +307,25 @@ const getFanByACCKey = key => {
 function readStr(fileBuffer, start, len) {
   const Arr = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
-    Arr[i] = fileBuffer.readInt8(start + i);
+    Arr[i] = fileBuffer.readUInt8(start + i);
   }
   return Arr;
 }
 
-function writeStr(uint8Arr, start, len, fileBuffer) {
+function writeStr(uint8Arr, start, len, buffer) {
   if (typeof uint8Arr === 'object') {
     for (let i = 0; i < len; i++)
-      fileBuffer.writeInt8(uint8Arr[i], start + i);
+      buffer.writeUInt8(uint8Arr[i], start + i);
   } else if (typeof uint8Arr === 'number') {
     for (let i = 0; i < len; i++)
-      fileBuffer.writeInt8(uint8Arr, start + i);
+      buffer.writeUInt8(uint8Arr, start + i);
   }
-  return fileBuffer;
+  return buffer;
 }
 
 function writeCmd(ptr, start, len, fileBuffer) {
   for (let i = 0; i < len; i++) {
-    fileBuffer.writeInt8(ptr[i], start + i);
+    fileBuffer.writeUInt8(ptr[i], start + i);
   }
   return fileBuffer;
 }

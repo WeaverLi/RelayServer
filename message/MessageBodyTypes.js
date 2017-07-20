@@ -3,90 +3,87 @@
  */
 
 // 注册(登录)请求消息
-const MSG_R_REGIST_REQ = {
-  rType: 1,
-  rCnt: 0,
-  rLen: 0,
+function MSG_R_REGIST_REQ({rType = 1, rCnt = 0, rLen = 0, devType = 0, hVer = 0, sVer = 0, devName = '', seriaNo = ''}) {
+  this.rType = rType;
+  this.rCnt = rCnt;
+  this.rLen = rLen;
 
-  devType: 0,
-  hVer: 0,
-  sVer: 0,
-  devName: '',
-  seriaNo: ''
-};
+  this.devType = devType;
+  this.hVer = hVer;
+  this.sVer = sVer;
+  this.devName = devName;
+  this.seriaNo = seriaNo;
+}
 
 // 心跳请求消息,多个通道的消息
-const MSG_R_HEARTBEAT_REQ = {
-  rType: 2,
-  rCnt: 0,
-  rLen: 0,
+function MSG_R_HEARTBEAT_REQ({
+                               rType = 2, rCnt = 0, rLen = 0, heartBeat = new Array(16).fill({
+    type: 0, number: 0, param: 0
+  })
+                             }) {
+  this.rType = rType;
+  this.rCnt = rCnt;
+  this.rLen = rLen;
 
-  heartBeat: heartBeat16({type: 0, number: 0, param: 0})
-};
+  this.heartBeat = heartBeat;
+}
 
 // 注册(登录)响应消息
-const MSG_R_REGIST_RES = {
-  rType: 1,
-  rCnt: 0,
-  rLen: 0,
+function MSG_R_REGIST_RES({rType = 1, rCnt = 0, rLen = 0, devID = 0, token = 0, ts = 10}) {
+  this.rType = rType;
+  this.rCnt = rCnt;
+  this.rLen = rLen;
 
-  devID: 0,
-  token: 0,
-  ts: 10
-};
+  this.devID = devID;
+  this.token = token;
+  this.ts = ts;
+}
 
 // 心跳响应消息
-const MSG_R_HEARTBEAT_RES = {
-  rType: 2,
-  rCnt: 0,
-  rLen: 0,
+function MSG_R_HEARTBEAT_RES({rType = 2, rCnt = 0, rLen = 0, token = 0, ts = 10}) {
+  this.rType = rType;
+  this.rCnt = rCnt;
+  this.rLen = rLen;
 
-  token: 0,
-  ts: 10
-};
+  this.token = token;
+  this.ts = ts;
+}
 
 /**
  * 控制、查询
  */
 
 // 控制请求消息
-const MSG_M_COMMAND_REQ = {
-  chnlType: '',
-  chnlNumber: 0,
-  chnlParam: '',
+function MSG_M_COMMAND_REQ({chnlType = '', chnlNumber = 0, chnlParam = '', length = 0, mVer = 0, mType = 0, mParam = '', cmds = 0}) {
+  this.chnlType = chnlType;
+  this.chnlNumber = chnlNumber;
+  this.chnlParam = chnlParam;
 
-  length: 0,
-  mVer: 0,
-  mType: 0,
-  mParam: '',
+  this.length = length;
+  this.mVer = mVer;
+  this.mType = mType;
+  this.mParam = mParam;
 
-  cmds: 0
-};
+  this.cmds = cmds;
+}
 
 // 查询请求消息
-const MSG_H_COMMAND_REQ = {
-  chnlType: '',
-  chnlNumber: 0,
-  chnlParam: '',
-};
+function MSG_H_COMMAND_REQ({chnlType = '', chnlNumber = 0, chnlParam = ''}) {
+  this.chnlType = chnlType;
+  this.chnlNumber = chnlNumber;
+  this.chnlParam = chnlParam;
+}
+
 
 // 控制成功应答消息
-const MSG_M_COMMAND_RES = {};
+function MSG_M_COMMAND_RES() {
+}
 
 // 查询成功应答消息
-const MSG_H_COMMAND_RES = {
-  chnlType: '',
-  chnlNumber: 0,
-  chnlParam: '',
-};
-
-function heartBeat16({type, number, param}) {
-  const heartBearArr = new Array(16);
-  for (let item of heartBearArr) {
-    item = {type, number, param};
-  }
-
-  return heartBearArr;
+function MSG_H_COMMAND_RES() {
+  this.chnlType = '';
+  this.chnlNumber = 0;
+  this.chnlParam = '';
 }
 
 module.exports = {

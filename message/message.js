@@ -29,20 +29,11 @@ class Message {
   }
 
   addBody(msgBodyType, msgBody) {
-    const R_REGIST_REQ = MSG_R_REGIST_REQ,
-        R_HEARTBEAT_REQ = MSG_R_HEARTBEAT_REQ,
-        R_REGIST_RES = MSG_R_REGIST_RES,
-        R_HEARTBEAT_RES = MSG_R_HEARTBEAT_RES,
-        M_COMMAND_REQ = MSG_M_COMMAND_REQ,
-        H_COMMAND_REQ = MSG_H_COMMAND_REQ,
-        M_COMMAND_RES = MSG_M_COMMAND_RES,
-        H_COMMAND_RES = MSG_H_COMMAND_RES;
-
     switch (this.type) {
       case 'R':                  // 应该用不到
         switch (msgBodyType) {
           case 1:
-            this.bodys.push(Object.assign(msgBody, MSG_R_REGIST_REQ));
+            this.bodys.push(new MSG_R_REGIST_REQ(msgBody));
             // 更新消息头
             this.length += 4 + 72;
             // 更新数据部分头
@@ -53,7 +44,7 @@ class Message {
 
             break;
           case 2:
-            this.bodys.push(Object.assign(msgBody, MSG_R_HEARTBEAT_REQ));
+            this.bodys.push(new MSG_R_HEARTBEAT_REQ(msgBody));
             // 更新消息头
             this.length += 4 + 64;
             // 更新数据部分头
@@ -71,7 +62,7 @@ class Message {
       case 'r':
         switch (msgBodyType) {
           case 1:
-            this.bodys.push(Object.assign(msgBody, MSG_R_REGIST_RES));
+            this.bodys.push(new MSG_R_REGIST_RES(msgBody));
             // 更新消息头
             this.length += 4 + 12;
             // 更新数据头部
@@ -82,7 +73,7 @@ class Message {
 
             break;
           case 2:
-            this.bodys.push(Object.assign(msgBody, MSG_R_HEARTBEAT_RES));
+            this.bodys.push(new MSG_R_HEARTBEAT_RES(msgBody));
             // 更新消息头
             this.length += 4 + 8;
             // 更新数据头部
@@ -98,7 +89,7 @@ class Message {
         break;
 
       case 'M':
-        this.bodys.push(Object.assign(msgBody, MSG_M_COMMAND_REQ));
+        this.bodys.push(new MSG_M_COMMAND_REQ(msgBody));
         // 更新消息头
         this.length += 4 + 4 + this.bodys[this.bodys.length - 1].cmds.byteLength;
         // 更新数据长度信息
@@ -107,7 +98,7 @@ class Message {
         break;
 
       case 'H':
-        this.bodys.push(Object.assign(msgBody, MSG_H_COMMAND_REQ));
+        this.bodys.push(new MSG_H_COMMAND_REQ(msgBody));
         // 更新消息头
         this.length += 4;
 
@@ -117,7 +108,7 @@ class Message {
         break;
 
       case 'h':                            // 应该用不到
-        this.bodys.push(Object.assign(msgBody, MSG_H_COMMAND_RES));
+        this.bodys.push(new MSG_H_COMMAND_RES(msgBody));
         // 更新消息头
         this.length += 4;
 

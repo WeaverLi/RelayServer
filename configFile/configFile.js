@@ -8,7 +8,7 @@ const {
   TYPE_AC,
   CMD_KEYCODE_BOFU,
   MASK_MASK,
-  MASK_IR,
+  // MASK_IR,
   MASK_WAVEKC,
   MASK_2262,
   MASK_1527,
@@ -30,32 +30,26 @@ const {
 } = require('./loadCfgFile');
 
 class ConfigFile {
-  constructor({aid, type, applianceType, manufact, model, cmd}) {
+  constructor({aid = 0, type = 0, applianceType = '', manufact = '', model = '', cmd = []}) {
     this.aid = aid;                //所属电器id，对无线命令码的生成有作用
-    this.type = type || 0;                 //0自定义
-    this.applianceType = applianceType || '';
-    this.manufact = manufact || '';
-    this.model = model || '';
+    this.type = type;                 //0自定义
+    this.applianceType = applianceType;
+    this.manufact = manufact;
+    this.model = model;
 
-    this.cmds = cmd || [];                // cmds = new ArrayList<Command>();
+    this.cmds = cmd;                // cmds = new ArrayList<Command>();
     this.map = new Map();
     this.map2 = new Map();
   }
 
-  async loadFile(fileName) {
+  loadFile(fileName) {
     const fileInfo = new FileInfo();
-    const fileBuffer = await new Promise((resolve, reject) => {
-      fs.readFile(__dirname + `/${fileName}`, (err, buf) => {
-        if (err) {
-          console.log('read file ERROR!', err);
-          reject(-1);
-        }
-        resolve(buf);
-      });
-    });
+    const fd = fs.openSync(__dirname + `/${fileName}`,'r');
+    if (!fd) return -1;
 
     // 解析文件并给属性赋值
-    const ret = readFile(fileBuffer, fileInfo);
+    const ret = readFile(fd, fileInfo);
+    console.log(fileInfo);
     if (ret !== 0 || fileInfo.cmdNum < 0) {
       console.log("indexoffset %u ret %d fileInfo.cmdNum %u", fileInfo.indexOffset, ret, fileInfo.cmdNum);
       console.log("ERROR: read file error,check file format");
@@ -73,7 +67,7 @@ class ConfigFile {
     // 解析命令并给属性赋值
     for (let i = 0; i < loopct; i++) {
       const cmdInfo = new CmdInfo();
-      const error = readCommand(fileBuffer, fileInfo, cmdInfo, i);
+      const error = readCommand(fd, fileInfo, cmdInfo, i);
 
       //不允许length越界的情况
       if (error < 0) {
@@ -126,10 +120,11 @@ class ConfigFile {
       else//红外调制波形MASK_IR，正常读取文件
         rf = 0;
 
-      let cmdBuffer, cmdArr;
+      let cmdBuffer = Buffer.alloc(cmdInfo.length);
+      let cmdArr;
       //读取命令码
       if (rf === 0) {
-        cmdBuffer = fileBuffer.readUIntBE(cmdInfo.offset, cmdInfo.length);
+        fs.readSync(fd, cmdBuffer, 0, cmdInfo.length, cmdInfo.offset)
       }
       else { //创建命令
         cmdBuffer = tmp.readUIntBE(0, cmdInfo.length);
@@ -147,29 +142,26 @@ class ConfigFile {
       loaded++;
     }
 
+    fs.closeSync(fd);
     console.log("load cmdnum = %d,loop count=%d,loaded=%d. %x", fileInfo.cmdNum, loopct, loaded, fileInfo.ekind);
     return loaded;
   }
 
-  async storeFile(fileName) {
+  storeFile(fileName) {
     const fileInfo = new FileInfo();
     let sucCount = 0;
+    const fd = fs.openSync(__dirname + `/${fileName}`, 'w+');
 
-    await new Promise((resolve, reject) => {
-      fs.readFile(__dirname + `/${fileName}`, (err, buf) => {
-        if (err) {
-          console.log('read file ERROR!', err);
-          reject(-1);
-        }
-        resolve(0);
-      });
-    });
+    if (!fd) {
+      console.log("ERROR: open file error !");
+      return -1;
+    }
 
     fileInfo.etype = (this.applianceType !== null) ? this.applianceType : 0;
     fileInfo.Manufacturer = (this.manufact !== null) ? this.manufact : 0;
     fileInfo.model = (this.model !== null) ? this.model : 0;
     fileInfo.ekind = this.type;
-    if (fileInfo.ekind !== T_AC) {//非红外空调命令
+    if (fileInfo.ekind !== TYPE_AC) {//非红外空调命令
       fileInfo.cmdHeadSize = 32;
       fileInfo.cmdSize = fileInfo.cmdHeadSize + 330;
     }
@@ -179,16 +171,16 @@ class ConfigFile {
     }
 
     //配码命令不需要存储，存储也只会使用其名字
-    if ((fileInfo.ekind & MASK_MASK === MASK_2262)
-        || (fileInfo.ekind & MASK_MASK === MASK_1527)
-        || (fileInfo.ekind & MASK_MASK === MASK_WAVEKC)
-        || (fileInfo.ekind & MASK_MASK === MASK_STATE)) {
+    if (((fileInfo.ekind & MASK_MASK) === MASK_2262)
+        || ((fileInfo.ekind & MASK_MASK) === MASK_1527)
+        || ((fileInfo.ekind & MASK_MASK) === MASK_WAVEKC)
+        || ((fileInfo.ekind & MASK_MASK) === MASK_STATE)) {
       console.log("Warning:will create rf file %x", fileInfo.ekind);
       //		finfo.cmdHeadSize = 32;
       //		finfo.cmdSize = 32;//不需要保存命令码
     }
 
-    if (creatFile(fileBuffer, fileInfo) < 0) {
+    if (creatFile(fd, fileInfo) < 0) {
       console.log("ERROR: write file error,check file format");
       return -2;
     }
@@ -202,7 +194,7 @@ class ConfigFile {
       cmdInfo.name = (this.cmds[i].name !== null) ? this.cmds[i].name : 0;
       cmdInfo.length = this.cmds[i].cmd.length;
 
-      if (writeCommand(fileBuffer, fileInfo, cmdInfo, this.cmds[i].cmd) >= 0)
+      if (writeCommand(fd, fileInfo, cmdInfo, this.cmds[i].cmd) >= 0)
         sucCount++;
       else
         console.log("ERROR write command NO.%d", i);
@@ -278,7 +270,7 @@ class ConfigFile {
     cmd.key = key;
 
     if (this.type === TYPE_AC) {//是空调命令
-      cmd.name = BasicTypes.GetNameByKey(key);    // 这里有问题？？？？？
+      // cmd.name = BasicTypes.GetNameByKey(key);    // 这里有问题？？？？？
       if (this.map.has(key)) {
         const index = this.cmds.findIndex(value => value === this.map.get(cmd.key));
         this.cmds[index] = cmd;
