@@ -77,7 +77,7 @@ class ConfigFile {
 
       //不允许length越界的情况
       if (error < 0) {
-        if (fileInfo.eKind !== TYPE_AC)
+        if (fileInfo.ekind !== TYPE_AC)
           console.log("cmd NO.%d error = %d,lenth=%d, filesize =%d, cmdoff=%d", i, error, cmdInfo.length, fileInfo.cmdSize, cmdInfo.offset);
         else
           console.log("AC cmd %d error = %d,clenth=%d, cmdSize =%d, cmdoff=%d", i, error, cmdInfo.length, fileInfo.cmdSize, cmdInfo.offset);
@@ -87,7 +87,7 @@ class ConfigFile {
 
       const tmp = Buffer.alloc(160);//自动生成配码命令（根据保存的命令名字）
       let rf = 1;//是否重新创建命令，0表示直接读取文件中的命令码
-      if ((fileInfo.eKind & MASK_MASK) === MASK_2262) {// 生成12个2bit，存到12字节中，文件内容无意义
+      if ((fileInfo.ekind & MASK_MASK) === MASK_2262) {// 生成12个2bit，存到12字节中，文件内容无意义
         cmdInfo.length = 12;
         const rfcode = (this.aid & 0xfffff);       //取20bit
         for (let j = 0; j < 10; j++)
@@ -95,13 +95,13 @@ class ConfigFile {
         tmp.writeUInt8(i % 3, 10);
         tmp.writeUInt8(i / 3, 11);
       }
-      else if ((fileInfo.eKind & MASK_MASK) === MASK_1527) {      // 生成24个1bit，存到24字节中，文件内容无意义
+      else if ((fileInfo.ekind & MASK_MASK) === MASK_1527) {      // 生成24个1bit，存到24字节中，文件内容无意义
         cmdInfo.length = 24;
         const rfcode = (this.aid & 0x1fffff) | ((i + 1) << 21);   //取21bit,i的3bit最多8个命令
         for (let j = 0; j < 24; j++)
           tmp.writeUInt8((rfcode & (1 << j)) >> j, j);
       }
-      else if ((fileInfo.eKind & MASK_MASK) === MASK_WAVEKC) {//根据aid和命令的keycode决定如何生成命令，文件内容无意义
+      else if ((fileInfo.ekind & MASK_MASK) === MASK_WAVEKC) {//根据aid和命令的keycode决定如何生成命令，文件内容无意义
         //前4个字节在文件中应该也有，可以读4个字节，也可以根据key重新生成。
         cmdInfo.length = 4;             //MASK_TWAVE命令前四个字节为发送方式
         tmp.writeUInt8(cmdInfo.key.count, 0);//发几轮，默认1
@@ -113,14 +113,14 @@ class ConfigFile {
           cmdInfo.length = buildBOFU(tmp, this.aid, i);
         //不支持的直接返回4，模块不会处理，app可以提示不支持
       }
-      else if ((fileInfo.eKind & MASK_MASK) === MASK_STATE) {//状态命令
+      else if ((fileInfo.ekind & MASK_MASK) === MASK_STATE) {//状态命令
         cmdInfo.length = 4;//取得key即可，无需读取文件
         tmp.writeUInt8(cmdInfo.key, 0);//状态码，发给设备
         tmp.writeUIntBE(0, 1, 3);
 
         rf = 0;//还是读文件吧，将忽略上面的tmp
       }
-      else if ((fileInfo.eKind & MASK_MASK) === MASK_WAVE) {//通用波形（备用），正常读取文件，直接TWAVE发送
+      else if ((fileInfo.ekind & MASK_MASK) === MASK_WAVE) {//通用波形（备用），正常读取文件，直接TWAVE发送
         rf = 0;//命令已经是TWAVE，无须再转
       }
       else//红外调制波形MASK_IR，正常读取文件
@@ -138,7 +138,7 @@ class ConfigFile {
       cmdArr = new Uint8Array(cmdBuffer);
       const command = new Command({
         name: (cmdInfo.name[0] !== 0) ? cmdInfo.name : new Uint8Array(20),
-        locate: cmdInfo.locate,
+        locale: cmdInfo.locale,
         style: cmdInfo.style,
         cmd: cmdArr
       });
@@ -147,7 +147,7 @@ class ConfigFile {
       loaded++;
     }
 
-    console.log("load cmdnum = %d,loop count=%d,loaded=%d. %x", fileInfo.cmdNum, loopct, loaded, fileInfo.eKind);
+    console.log("load cmdnum = %d,loop count=%d,loaded=%d. %x", fileInfo.cmdNum, loopct, loaded, fileInfo.ekind);
     return loaded;
   }
 
@@ -169,7 +169,7 @@ class ConfigFile {
     fileInfo.Manufacturer = (this.manufact !== null) ? this.manufact : 0;
     fileInfo.model = (this.model !== null) ? this.model : 0;
     fileInfo.ekind = this.type;
-    if (fileInfo.eKind !== T_AC) {//非红外空调命令
+    if (fileInfo.ekind !== T_AC) {//非红外空调命令
       fileInfo.cmdHeadSize = 32;
       fileInfo.cmdSize = fileInfo.cmdHeadSize + 330;
     }
@@ -179,11 +179,11 @@ class ConfigFile {
     }
 
     //配码命令不需要存储，存储也只会使用其名字
-    if ((fileInfo.eKind & MASK_MASK === MASK_2262)
-        || (fileInfo.eKind & MASK_MASK === MASK_1527)
-        || (fileInfo.eKind & MASK_MASK === MASK_WAVEKC)
-        || (fileInfo.eKind & MASK_MASK === MASK_STATE)) {
-      console.log("Warning:will create rf file %x", fileInfo.eKind);
+    if ((fileInfo.ekind & MASK_MASK === MASK_2262)
+        || (fileInfo.ekind & MASK_MASK === MASK_1527)
+        || (fileInfo.ekind & MASK_MASK === MASK_WAVEKC)
+        || (fileInfo.ekind & MASK_MASK === MASK_STATE)) {
+      console.log("Warning:will create rf file %x", fileInfo.ekind);
       //		finfo.cmdHeadSize = 32;
       //		finfo.cmdSize = 32;//不需要保存命令码
     }
