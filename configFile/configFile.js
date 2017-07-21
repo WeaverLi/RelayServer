@@ -27,6 +27,7 @@ const {
   getModeByACCKey,
   getTempByACCKey,
   getSpeedByACCKey,
+  strToUint8Arr
 } = require('./loadCfgFile');
 
 class ConfigFile {
@@ -44,11 +45,12 @@ class ConfigFile {
 
   loadFile(fileName) {
     const fileInfo = new FileInfo();
-    const fd = fs.openSync(__dirname + `/${fileName}`,'r');
+    const fd = fs.openSync(__dirname + `/${fileName}`, 'r');
     if (!fd) return -1;
 
     // 解析文件并给属性赋值
-    const ret = readFile(fd, fileInfo);
+    const fileBuffer = fs.readFileSync(fd);
+    const ret = readFile(fileBuffer, fileInfo);
     console.log(fileInfo);
     if (ret !== 0 || fileInfo.cmdNum < 0) {
       console.log("indexoffset %u ret %d fileInfo.cmdNum %u", fileInfo.indexOffset, ret, fileInfo.cmdNum);
@@ -56,9 +58,9 @@ class ConfigFile {
       return -2;
     }
     this.type = fileInfo.ekind;
-    this.applianceType = fileInfo.etype;
-    this.manufact = fileInfo.Manufacturer;
-    this.model = fileInfo.model;
+    this.applianceType = String.fromCharCode.apply(String, fileInfo.etype);
+    this.manufact = String.fromCharCode.apply(String, fileInfo.Manufacturer);
+    this.model = String.fromCharCode.apply(String, fileInfo.model);
 
     //获得循环次数
     const loopct = (fileInfo.ekind === TYPE_AC) ? fileInfo.indexAreaSize : fileInfo.cmdNum;
@@ -67,7 +69,7 @@ class ConfigFile {
     // 解析命令并给属性赋值
     for (let i = 0; i < loopct; i++) {
       const cmdInfo = new CmdInfo();
-      const error = readCommand(fd, fileInfo, cmdInfo, i);
+      const error = readCommand(fileBuffer, fileInfo, cmdInfo, i);
 
       //不允许length越界的情况
       if (error < 0) {
@@ -100,7 +102,7 @@ class ConfigFile {
         cmdInfo.length = 4;             //MASK_TWAVE命令前四个字节为发送方式
         tmp.writeUInt8(cmdInfo.key.count, 0);//发几轮，默认1
         tmp.writeUInt8(cmdInfo.key.intval, 1);//时间长度单位，默认20us。
-        tmp.writeUInt16BE(0, 2);
+        tmp.writeUInt16LE(0, 2);
 
         //根据厂家开始生成波形，模块直接发送。
         if (cmdInfo.key.type === CMD_KEYCODE_BOFU)
@@ -120,21 +122,22 @@ class ConfigFile {
       else//红外调制波形MASK_IR，正常读取文件
         rf = 0;
 
-      let cmdBuffer = Buffer.alloc(cmdInfo.length);
+      let cmdBuffer;
       let cmdArr;
       //读取命令码
       if (rf === 0) {
-        fs.readSync(fd, cmdBuffer, 0, cmdInfo.length, cmdInfo.offset)
+        cmdBuffer = fileBuffer.slice(cmdInfo.offset, cmdInfo.offset + cmdInfo.length);
       }
       else { //创建命令
-        cmdBuffer = tmp.readUIntBE(0, cmdInfo.length);
+        cmdBuffer = tmp.slice(0, cmdInfo.length);
       }
 
       cmdArr = new Uint8Array(cmdBuffer);
       const command = new Command({
-        name: (cmdInfo.name[0] !== 0) ? cmdInfo.name : new Uint8Array(20),
+        name: (cmdInfo.name[0] !== 0) ? String.fromCharCode.apply(String, cmdInfo.name) : '',
         locale: cmdInfo.locale,
         style: cmdInfo.style,
+        key: cmdInfo.key,
         cmd: cmdArr
       });
 
@@ -157,17 +160,17 @@ class ConfigFile {
       return -1;
     }
 
-    fileInfo.etype = (this.applianceType !== null) ? this.applianceType : 0;
-    fileInfo.Manufacturer = (this.manufact !== null) ? this.manufact : 0;
-    fileInfo.model = (this.model !== null) ? this.model : 0;
+    fileInfo.etype = strToUint8Arr(this.applianceType, 16);
+    fileInfo.Manufacturer = strToUint8Arr(this.manufact, 16);
+    fileInfo.model = strToUint8Arr(this.model, 32);
     fileInfo.ekind = this.type;
     if (fileInfo.ekind !== TYPE_AC) {//非红外空调命令
       fileInfo.cmdHeadSize = 32;
-      fileInfo.cmdSize = fileInfo.cmdHeadSize + 330;
+      fileInfo.cmdSize = fileInfo.cmdHeadSize + 160;
     }
     else {
       fileInfo.cmdHeadSize = 2;
-      fileInfo.cmdSize = fileInfo.cmdHeadSize + 360;
+      fileInfo.cmdSize = fileInfo.cmdHeadSize + 160;
     }
 
     //配码命令不需要存储，存储也只会使用其名字
@@ -191,8 +194,10 @@ class ConfigFile {
       cmdInfo.locale = this.cmds[i].locale;
       cmdInfo.style = this.cmds[i].style;
       cmdInfo.key = this.cmds[i].key;
-      cmdInfo.name = (this.cmds[i].name !== null) ? this.cmds[i].name : 0;
+      cmdInfo.name = strToUint8Arr(this.cmds[i].name, 20);
       cmdInfo.length = this.cmds[i].cmd.length;
+
+      console.log(i,'  ',this.cmds[i].cmd);
 
       if (writeCommand(fd, fileInfo, cmdInfo, this.cmds[i].cmd) >= 0)
         sucCount++;

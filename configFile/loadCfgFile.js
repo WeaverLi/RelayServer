@@ -9,8 +9,7 @@
 const fs = require('fs');
 const {FileInfo, TYPE_AC} = require('./fileTypes');
 
-const readFile = (fd, fileInfo) => {
-  const fileBuffer = fs.readFileSync(fd);
+const readFile = (fileBuffer, fileInfo) => {
   // 返回-5 ：读文件失败
   if (fileBuffer.byteLength < 8) {
     return -5;
@@ -26,14 +25,14 @@ const readFile = (fd, fileInfo) => {
   fileInfo.Manufacturer = readStr(fileBuffer, 24, 16);
   fileInfo.model = readStr(fileBuffer, 40, 32);
 
-  // fileInfo.panelHeight = fileBuffer.getUint16(72);
-  // fileInfo.panelWidth = fileBuffer.getUint16(74);
+  fileInfo.panelHeight = fileBuffer.readUInt16LE(72);
+  fileInfo.panelWidth = fileBuffer.readUInt16LE(74);
 
   fileInfo.indexAreaSize = fileBuffer.readUInt16LE(fileInfo.indexOffset);
-  fileInfo.idxSize = fileBuffer.readUInt16LE(fileInfo.indexOffset + 2);
-  fileInfo.cmdHeadSize = fileBuffer.readUInt8(fileInfo.indexOffset + 1);
+  fileInfo.idxSize = fileBuffer.readUInt8(fileInfo.indexOffset + 2);
+  fileInfo.cmdHeadSize = fileBuffer.readUInt8(fileInfo.indexOffset + 3);
 
-  fileInfo.cmdSize = fileBuffer.readUInt16LE(fileInfo.indexOffset + 1);
+  fileInfo.cmdSize = fileBuffer.readUInt16LE(fileInfo.indexOffset + 4);
 
   fileInfo.fileSize = fileBuffer.byteLength;
   fileInfo.cmdNum = (fileInfo.fileSize - fileInfo.cmdOffset) / fileInfo.cmdSize;
@@ -41,9 +40,7 @@ const readFile = (fd, fileInfo) => {
   return 0;
 };
 
-const readCommand = (fd, fileInfo, cmdInfo, index) => {
-  const fileBuffer = fs.readFileSync(fd);
-
+const readCommand = (fileBuffer, fileInfo, cmdInfo, index) => {
   // 无索引表的情况，目前表示除空调外的其他电器
   if (fileInfo.idxSize === 0) {
     //判断配置文件是否存储了多于（index+1）条命令,否则index越界
@@ -60,17 +57,17 @@ const readCommand = (fd, fileInfo, cmdInfo, index) => {
 
     //表示有cmdhead的结构
     if (fileInfo.cmdHeadSize === 32) {
-      cmdInfo.locale = fileBuffer.readInt32BE(fileInfo.cmdOffset + index * fileInfo.cmdSize);
-      cmdInfo.style = fileBuffer.readInt32BE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 4);
-      cmdInfo.key = fileBuffer.readInt16BE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 8);
+      cmdInfo.locale = fileBuffer.readUInt32LE(fileInfo.cmdOffset + index * fileInfo.cmdSize);
+      cmdInfo.style = fileBuffer.readUInt32LE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 4);
+      cmdInfo.key = fileBuffer.readUInt16LE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 8);
       cmdInfo.name = readStr(fileBuffer, fileInfo.cmdOffset + index * fileInfo.cmdSize + 10, 20);
+      cmdInfo.length = fileBuffer.readUInt16LE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 30);
     }
-    cmdInfo.length = fileBuffer.readInt16BE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 30);
   }
   //有索引表的情况，目前就是空调
   else if (fileInfo.idxSize === 2) {
     // const realIndexAreaSize = (fileInfo.cmdOffset - fileInfo.indexOffset - 6) / fileInfo.idxSize;
-    const content = fileBuffer.readInt16BE(fileInfo.indexOffset + 6 + index * 2);
+    const content = fileBuffer.readUInt16LE(fileInfo.indexOffset + 6 + index * 2);
     if (content === 0xffff) return -1;
 
     cmdInfo.key = index;
@@ -81,13 +78,14 @@ const readCommand = (fd, fileInfo, cmdInfo, index) => {
     }
 
     //表示有cmdhead的结构
-    if (fileInfo.cmdHeadSize === 32) {
-      cmdInfo.locale = fileBuffer.readInt32BE(fileInfo.cmdOffset + index * fileInfo.cmdSize);
-      cmdInfo.style = fileBuffer.readInt32BE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 4);
-      cmdInfo.key = fileBuffer.readInt16BE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 8);
-      cmdInfo.name = readStr(fileBuffer, fileInfo.cmdOffset + index * fileInfo.cmdSize + 10, 20);
-    }
-    cmdInfo.length = fileBuffer.readInt16BE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 30);
+    // if (fileInfo.cmdHeadSize === 32) {
+    //   cmdInfo.locale = fileBuffer.readUInt32LE(fileInfo.cmdOffset + index * fileInfo.cmdSize);
+    //   cmdInfo.style = fileBuffer.readUInt32LE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 4);
+    //   cmdInfo.key = fileBuffer.readUInt16LE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 8);
+    //   cmdInfo.name = readStr(fileBuffer, fileInfo.cmdOffset + index * fileInfo.cmdSize + 10, 20);
+    //   cmdInfo.length = fileBuffer.readUInt16LE(fileInfo.cmdOffset + index * fileInfo.cmdSize + 30);
+    // }
+    cmdInfo.length = fileBuffer.readUInt16LE(cmdInfo.offset - fileInfo.cmdHeadSize);
   }
 
   return 0;
@@ -100,13 +98,14 @@ const creatFile = (fd, fileInfo) => {
   }
 
   const newFileInfo = new FileInfo();
+  const newFileBuffer = fs.readFileSync(fd);
   //判断是否是已存在的合法文件,是则可能改变fileInfo
-  if (readFile(fd, newFileInfo) === 0) {
+  if (readFile(newFileBuffer, newFileInfo) === 0) {
     fs.writeSync(fd, fileInfo.etype, 0, 16, 8);
     fs.writeSync(fd, fileInfo.Manufacturer, 0, 16, 24);
     fs.writeSync(fd, fileInfo.model, 0, 32, 40);
 
-    readFile(fd, fileInfo);
+    readFile(newFileBuffer, fileInfo);
     return 0;
   }
 
@@ -135,22 +134,23 @@ const creatFile = (fd, fileInfo) => {
   const headBuffer = Buffer.alloc(82);
   headBuffer.writeUInt8(fileInfo.version, 0);
   headBuffer.writeUInt8(fileInfo.ekind, 1);
-  headBuffer.writeUInt16BE(fileInfo.indexOffset, 2);
-  headBuffer.writeUInt16BE(fileInfo.cmdOffset, 4);
-  headBuffer.writeUInt16BE(fileInfo.headCRC, 6);
+  headBuffer.writeUInt16LE(fileInfo.indexOffset, 2);
+  headBuffer.writeUInt16LE(fileInfo.cmdOffset, 4);
+  headBuffer.writeUInt16LE(fileInfo.headCRC, 6);
 
   writeStr(fileInfo.etype, 8, 16, headBuffer);
   writeStr(fileInfo.Manufacturer, 24, 16, headBuffer);
   writeStr(fileInfo.model, 40, 32, headBuffer);
 
-  headBuffer.writeUInt16BE(fileInfo.panelHeight, 72);
-  headBuffer.writeUInt16BE(fileInfo.panelWidth, 74);
+  headBuffer.writeUInt16LE(fileInfo.panelHeight, 72);
+  headBuffer.writeUInt16LE(fileInfo.panelWidth, 74);
 
-  headBuffer.writeUInt16BE(fileInfo.indexAreaSize, 76);
+  headBuffer.writeUInt16LE(fileInfo.indexAreaSize, 76);
   headBuffer.writeUInt8(fileInfo.idxSize, 78);
   headBuffer.writeUInt8(fileInfo.cmdHeadSize, 79);
-  headBuffer.writeUInt16BE(fileInfo.cmdSize, 80);
+  headBuffer.writeUInt16LE(fileInfo.cmdSize, 80);
 
+  console.log(headBuffer);
   fs.writeSync(fd, headBuffer, 0, 82, 0);
   return 0;
 };
@@ -158,7 +158,8 @@ const creatFile = (fd, fileInfo) => {
 const writeCommand = (fd, fileInfo, cmdInfo, cmd) => {
   if (fileInfo === null) {
     const newFileInfo = new FileInfo();
-    readFile(fd, newFileInfo);
+    const newFileBuffer = fs.readFileSync(fd);
+    readFile(newFileBuffer, newFileInfo);
     fileInfo = newFileInfo;
   }
 
@@ -172,8 +173,8 @@ const writeCommand = (fd, fileInfo, cmdInfo, cmd) => {
     for (let i = 0; i < fileInfo.indexAreaSize; i++) {
       const bh = Buffer.alloc(2);
       fs.readSync(fd, bh, 0, 2, fileInfo.indexOffset + 6 + i * 2);
-      if (((bh.readUInt16BE(0) + 1) > tmp) && (bh.readUInt16BE(0) !== 0xffff)) {
-        tmp = bh.readUInt16BE(0) + 1;
+      if (((bh.readUInt16LE(0) + 1) > tmp) && (bh.readUInt16LE(0) !== 0xffff)) {
+        tmp = bh.readUInt16LE(0) + 1;
       }
     }
 
@@ -184,13 +185,13 @@ const writeCommand = (fd, fileInfo, cmdInfo, cmd) => {
   const appendBuffer2 = Buffer.alloc(2 + fileInfo.cmdSize - fileInfo.cmdHeadSize);
 
   if (fileInfo.cmdHeadSize === 32) {
-    appendBuffer1.writeUInt32BE(cmdInfo.locale, 0);
-    appendBuffer1.writeUInt32BE(cmdInfo.style, 4);
-    appendBuffer1.writeUInt16BE(cmdInfo.key, 8);
+    appendBuffer1.writeUInt32LE(cmdInfo.locale, 0);
+    appendBuffer1.writeUInt32LE(cmdInfo.style, 4);
+    appendBuffer1.writeUInt16LE(cmdInfo.key, 8);
     writeStr(cmdInfo.name, 10, 20, appendBuffer1);
     if (cmdInfo.length > fileInfo.cmdSize - fileInfo.cmdHeadSize)
       cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
-    appendBuffer1.writeUInt16BE(cmdInfo.length, 30);
+    appendBuffer1.writeUInt16LE(cmdInfo.length, 30);
     //保证写满命令项应有的长度
     writeCmd(cmd, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, appendBuffer1);
 
@@ -198,7 +199,7 @@ const writeCommand = (fd, fileInfo, cmdInfo, cmd) => {
   } else {
     if (cmdInfo.length > fileInfo.cmdSize - fileInfo.cmdHeadSize)
       cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
-    appendBuffer2.writeUInt16BE(cmdInfo.length, 0);
+    appendBuffer2.writeUInt16LE(cmdInfo.length, 0);
     //保证写满命令项应有的长度
     writeCmd(cmd, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, appendBuffer2);
 
@@ -330,6 +331,13 @@ function writeCmd(ptr, start, len, fileBuffer) {
   return fileBuffer;
 }
 
+function strToUint8Arr(str, len) {
+  const Arr = new Uint8Array(len);
+  for (let i = 0; i < str.length; i++)
+    Arr[i] = str.charCodeAt(i);
+  return Arr;
+}
+
 module.exports = {
   readFile,            // readFile(fileBuffer); 参数fileBuffer为文件的Buffer对象，返回成功为fileInfo,失败为为错误码
   readCommand,         // readCommand(fileBuffer,fileInfo,index); 参数index为，返回成功为cmdInfo,失败为错误码
@@ -341,5 +349,6 @@ module.exports = {
   getModeByACCKey,
   getTempByACCKey,
   getSpeedByACCKey,
-  getFanByACCKey
+  getFanByACCKey,
+  strToUint8Arr
 };
