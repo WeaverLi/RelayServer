@@ -86,6 +86,10 @@ function MSG_H_COMMAND_RES() {
   this.chnlParam = '';
 }
 
+function MSG_FAILED() {
+
+}
+
 module.exports = {
   MSG_R_REGIST_REQ,
   MSG_R_HEARTBEAT_REQ,
@@ -94,5 +98,6 @@ module.exports = {
   MSG_M_COMMAND_REQ,
   MSG_H_COMMAND_REQ,
   MSG_M_COMMAND_RES,
-  MSG_H_COMMAND_RES
+  MSG_H_COMMAND_RES,
+  MSG_FAILED
 };

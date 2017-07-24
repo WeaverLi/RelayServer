@@ -131,13 +131,12 @@ class Message {
         for (let j = 0; j < i; j++) {
           newOffset += 4 + this.bodys[j].rLen;
         }
-        // bufferBodyArr.push(new DataView(buffer, newOffset, this.bodys[i].rLen + 4));
         bufferBodyArr.push(buffer.slice(newOffset, newOffset + this.bodys[i].rLen + 4));
       }
     } else if (this.bodys.length = 1 && (this.type === 'M' || this.type === 'H')) {
       bufferBodyArr.push(buffer.slice(newOffset, this.bodys.length - 4));
     } else if (this.type === 'f') {
-      // bufferBodyArr.push(buffer.slice());
+
     } else {
       new Error('给出的要编码的消息不正确！');
     }
@@ -345,7 +344,6 @@ class Message {
 
     if (strLen <= byteLen) {
       const strbuf = new Uint8Array(buffer, offset, strLen);
-      // return String.fromCharCode.apply(String, strbuf);
       return buffer.toString('ascii', offset, byteLen);
     }
     else {
