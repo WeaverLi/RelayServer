@@ -1,5 +1,5 @@
 const rp = require('request-promise');
-const {addDevObjToRedis, updateDevObjToRedis} = require('../../storeAPI/devObjAPI');
+const {addDevObjToRedis, updateDevObjToRedis} = require('../../objectCache/devObj');
 const writeData = require('../../util');
 const Message = require('../../message');
 
@@ -9,10 +9,10 @@ const messageRHandle = (tcpClient, msg) => {
 
   if (msg.bodys.length !== 0) {
     for (const body of msg.bodys) {
-      if (body.rType === 1 && netID === 0 && devID === 0) { //注册
+      if (body.rType === 1 && msg.netID === 0 && msg.devID === 0) { //注册
         const optionSignup = {
-          method: 'POST',
-          uri: 'http://localhost:3000/api/dev/verify',
+          method: 'GET',
+          uri: 'http://localhost:4000/api/dev/verify',
           body: {
             sn: body.seriaNo,
             type: body.devType,

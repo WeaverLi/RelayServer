@@ -132,16 +132,18 @@ class ConfigFile {
         cmdBuffer = tmp.slice(0, cmdInfo.length);
       }
 
-      cmdArr = new Uint8Array(cmdBuffer);
-      const command = new Command({
-        name: (cmdInfo.name[0] !== 0) ? String.fromCharCode.apply(String, cmdInfo.name) : '',
-        locale: cmdInfo.locale,
-        style: cmdInfo.style,
-        key: cmdInfo.key,
-        cmd: cmdArr
-      });
+      if (cmdBuffer.byteLength !== 0) {
+        cmdArr = new Uint8Array(cmdBuffer);
+        const command = new Command({
+          name: (cmdInfo.name[0] !== 0) ? String.fromCharCode.apply(String, cmdInfo.name) : '',
+          locale: cmdInfo.locale,
+          style: cmdInfo.style,
+          key: cmdInfo.key,
+          cmd: cmdArr
+        });
 
-      this.addCommand(cmdInfo.key, command);
+        this.addCommand(cmdInfo.key, command);
+      }
       loaded++;
     }
 
@@ -197,7 +199,7 @@ class ConfigFile {
       cmdInfo.name = strToUint8Arr(this.cmds[i].name, 20);
       cmdInfo.length = this.cmds[i].cmd.length;
 
-      console.log(i,'  ',this.cmds[i].cmd);
+      // console.log(this.cmds.length, this.cmds[i].key);
 
       if (writeCommand(fd, fileInfo, cmdInfo, this.cmds[i].cmd) >= 0)
         sucCount++;
@@ -205,6 +207,7 @@ class ConfigFile {
         console.log("ERROR write command NO.%d", i);
     }
 
+    fs.closeSync(fd);
     console.log("store command count = %d", sucCount);
     return sucCount;
   }

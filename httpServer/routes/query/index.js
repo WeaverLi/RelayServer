@@ -1,5 +1,5 @@
 const Message = require('../../../message');
-const {findDevObjFromRedis} = require('../../../storeAPI/devObjAPI');
+const {findDevObjFromRedis} = require('../../../objectCache/devObj');
 const writeData = require('../../../util');
 
 const query = (req, res) => {

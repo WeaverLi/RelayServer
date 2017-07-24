@@ -116,7 +116,6 @@ const creatFile = (fd, fileInfo) => {
   if (fileInfo.ekind === TYPE_AC) {
     fileInfo.indexAreaSize = 512;
     fileInfo.idxSize = 2;
-    fs.writeSync(fd, Buffer.alloc(fileInfo.indexAreaSize * fileInfo.idxSize, 0xff), 0, fileInfo.indexAreaSize * fileInfo.idxSize, fileInfo.indexOffset + 6);
   }
   // 其它电器
   else {
@@ -150,8 +149,10 @@ const creatFile = (fd, fileInfo) => {
   headBuffer.writeUInt8(fileInfo.cmdHeadSize, 79);
   headBuffer.writeUInt16LE(fileInfo.cmdSize, 80);
 
-  console.log(headBuffer);
   fs.writeSync(fd, headBuffer, 0, 82, 0);
+  if (fileInfo.ekind === TYPE_AC)
+    fs.writeSync(fd, Buffer.alloc(fileInfo.indexAreaSize * fileInfo.idxSize, 0xff), 0, fileInfo.indexAreaSize * fileInfo.idxSize, fileInfo.indexOffset + 6);
+
   return 0;
 };
 
@@ -169,7 +170,7 @@ const writeCommand = (fd, fileInfo, cmdInfo, cmd) => {
     if ((cmdInfo.key >= fileInfo.indexAreaSize)) {
       return -1;          // 返回-1 ：写空调命令越界
     }
-    let tmp = 0;
+    let tmp = Buffer.alloc(2);
     for (let i = 0; i < fileInfo.indexAreaSize; i++) {
       const bh = Buffer.alloc(2);
       fs.readSync(fd, bh, 0, 2, fileInfo.indexOffset + 6 + i * 2);
@@ -181,10 +182,8 @@ const writeCommand = (fd, fileInfo, cmdInfo, cmd) => {
     fs.writeSync(fd, tmp, 0, 2, fileInfo.indexOffset + 6 + cmdInfo.key * 2);
   }
 
-  const appendBuffer1 = Buffer.alloc(32 + fileInfo.cmdSize - fileInfo.cmdHeadSize);
-  const appendBuffer2 = Buffer.alloc(2 + fileInfo.cmdSize - fileInfo.cmdHeadSize);
-
   if (fileInfo.cmdHeadSize === 32) {
+    const appendBuffer1 = Buffer.alloc(32 + fileInfo.cmdSize - fileInfo.cmdHeadSize);
     appendBuffer1.writeUInt32LE(cmdInfo.locale, 0);
     appendBuffer1.writeUInt32LE(cmdInfo.style, 4);
     appendBuffer1.writeUInt16LE(cmdInfo.key, 8);
@@ -197,15 +196,16 @@ const writeCommand = (fd, fileInfo, cmdInfo, cmd) => {
 
     fs.appendFileSync(fd, appendBuffer1);
   } else {
-    if (cmdInfo.length > fileInfo.cmdSize - fileInfo.cmdHeadSize)
-      cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
-    appendBuffer2.writeUInt16LE(cmdInfo.length, 0);
-    //保证写满命令项应有的长度
-    writeCmd(cmd, 32, fileInfo.cmdSize - fileInfo.cmdHeadSize, appendBuffer2);
-
-    fs.appendFileSync(fd, appendBuffer2);
+    //   const appendBuffer2 = Buffer.alloc(2 + fileInfo.cmdSize - fileInfo.cmdHeadSize);
+    //   if (cmdInfo.length > fileInfo.cmdSize - fileInfo.cmdHeadSize)
+    //     cmdInfo.length = fileInfo.cmdSize - fileInfo.cmdHeadSize;
+    //   appendBuffer2.writeUInt16LE(cmdInfo.length, 0);
+    //   //保证写满命令项应有的长度
+    //   writeCmd(cmd, 2, fileInfo.cmdSize - fileInfo.cmdHeadSize, appendBuffer2);
+    //
+    //   fs.appendFileSync(fd, appendBuffer2);
+    // }
   }
-
   return 0;
 };
 

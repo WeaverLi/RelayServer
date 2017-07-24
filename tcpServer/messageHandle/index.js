@@ -3,8 +3,9 @@ const messageRHandle = require('./messageR');
 const messageMHHandle = require('./messageMH');
 
 const messageHandle = (tcpClient, messageBuffer) => {
-  const msg = new Message();
+  const msg = new Message({});
   const newMsg = msg.decode(messageBuffer);
+  console.log(newMsg);
 
   switch (newMsg.type) {
     case 'R':

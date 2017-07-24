@@ -19,12 +19,12 @@ const decodeHeartBeatArr = Symbol('decodeHeartBeatArr');    // 私有方法名�
 const byteOffset = 16;
 
 class Message {
-  constructor({type, token, netID, devID}) {  // 编码时需给定type,token,netID,devID,解码时都不需要给定
-    this.type = type || '';
+  constructor({type = '', token = 0, netID = 0, devID = 0}) {  // 编码时需给定type,token,netID,devID,解码时都不需要给定
+    this.type = type;
     this.length = 20;
-    this.token = token || 0;
-    this.netID = netID || 0;
-    this.devID = devID || 0;
+    this.token = token;
+    this.netID = netID;
+    this.devID = devID;
     this.bodys = [];
   }
 
@@ -121,39 +121,44 @@ class Message {
 
   // 编码
   encode() {
-    const buffer = new ArrayBuffer(this.length);
-
-    const bufferHead = new DataView(buffer, 0);
+    const buffer = Buffer.alloc(this.length);
+    const bufferHead = buffer;
     const bufferBodyArr = [];
-    // const dataBody = new DataView(buffer, byteOffset, this.length - 20);
-
     let newOffset = byteOffset;
-    for (let i = 0; i < this.bodys.length; i++) {
-      for (let j = 0; j < i; j++) {
-        newOffset += 4 + this.bodys[j].rLen;
+
+    if (this.bodys.length >= 1 && this.type === 'r') {
+      for (let i = 0; i < this.bodys.length; i++) {
+        for (let j = 0; j < i; j++) {
+          newOffset += 4 + this.bodys[j].rLen;
+        }
+        // bufferBodyArr.push(new DataView(buffer, newOffset, this.bodys[i].rLen + 4));
+        bufferBodyArr.push(buffer.slice(newOffset, newOffset + this.bodys[i].rLen + 4));
       }
-      bufferBodyArr.push(new DataView(buffer, newOffset, this.bodys[i].rLen + 4));
+    } else if (this.bodys.length = 1 && (this.type === 'M' || this.type === 'H')) {
+      bufferBodyArr.push(buffer.slice(newOffset, this.bodys.length - 4));
+    } else if (this.type === 'f') {
+      // bufferBodyArr.push(buffer.slice());
+    } else {
+      new Error('给出的要编码的消息不正确！');
     }
 
     this[encodeHead](bufferHead);
     this[encodeBody](bufferBodyArr);
 
-    // return Array.apply([], new Uint8Array(buffer));
     return buffer;
   }
 
   // 解码
   decode(buffer) {
-    const data = new Uint8Array(buffer);
-    const bufferHead = new DataView(data.buffer, 0, byteOffset);
-    const bufferBody = new DataView(data.buffer, byteOffset, buffer.byteLength - 20);
+    const bufferHead = buffer.slice(0, byteOffset);
+    const bufferBody = buffer.slice(byteOffset, buffer.byteLength - 4);
 
-    this.type = String.fromCharCode(bufferHead.getUint8(1));
-    this.length = bufferHead.getUint16(2);
+    this.type = String.fromCharCode(bufferHead.readUInt8(1));
+    this.length = bufferHead.readUInt16LE(2);
 
-    this.token = bufferHead.getUint32(4);
-    this.netID = bufferHead.getUint32(8);
-    this.devID = bufferHead.getUint32(12);
+    this.token = bufferHead.readUInt16LE(4);
+    this.netID = bufferHead.readUInt32LE(8);
+    this.devID = bufferHead.readUInt32LE(12);
 
     this.bodys = this[decodeBody](bufferBody);
 
@@ -163,16 +168,16 @@ class Message {
 
   // 私有方法，编码头部
   [encodeHead](bufferHead) {
-    bufferHead.setUint8(0, 0x7e);
-    bufferHead.setUint8(1, this.type.charCodeAt(0));
-    bufferHead.setUint16(2, this.length);
+    bufferHead.writeUInt8(0x7e, 0);
+    bufferHead.writeUInt8(this.type.charCodeAt(0), 1);
+    bufferHead.writeUInt16LE(this.length, 2);
 
-    bufferHead.setUint32(4, this.token);
-    bufferHead.setUint32(8, this.netID);
-    bufferHead.setUint32(12, this.devID);
+    bufferHead.writeUInt32LE(this.token, 4);
+    bufferHead.writeUInt32LE(this.netID, 8);
+    bufferHead.writeUInt32LE(this.devID, 12);
 
-    bufferHead.setUint16(this.length - 4, 0x0002);
-    bufferHead.setUint16(this.length - 2, 0);
+    bufferHead.writeUInt16LE(0x0002, this.length - 4);
+    bufferHead.writeUInt16LE(0, this.length - 2);
   }
 
   // 私有方法，编码bodys
@@ -185,21 +190,21 @@ class Message {
         case 'r':
           switch (this.bodys[i].rType) {
             case 1:
-              bufferBodyArr[i].setUint8(0, 0x01);
-              bufferBodyArr[i].setUint8(1, this.bodys[i].rCnt);
-              bufferBodyArr[i].setUint16(2, this.bodys[i].rLen);
+              bufferBodyArr[i].writeUInt8(0x01, 0);
+              bufferBodyArr[i].writeUInt8(this.bodys[i].rCnt, 1);
+              bufferBodyArr[i].writeUInt16LE(this.bodys[i].rLen, 2);
 
-              bufferBodyArr[i].setUint32(4, this.bodys[i].devID);
-              bufferBodyArr[i].setUint32(8, this.bodys[i].token);
-              bufferBodyArr[i].setUint32(12, this.bodys[i].ts);
+              bufferBodyArr[i].writeUInt32LE(this.bodys[i].devID, 4);
+              bufferBodyArr[i].writeUInt32LE(this.bodys[i].token, 8);
+              bufferBodyArr[i].writeUInt32LE(this.bodys[i].ts, 12);
               break;
             case 2:
-              bufferBodyArr[i].setUint8(0, 0x02);
-              bufferBodyArr[i].setUint8(1, this.bodys[i].rCnt);
-              bufferBodyArr[i].setUint16(2, this.bodys[i].rLen);
+              bufferBodyArr[i].writeUInt8(0x02, 0);
+              bufferBodyArr[i].writeUInt8(this.bodys[i].rCnt, 1);
+              bufferBodyArr[i].writeUInt16LE(this.bodys[i].rLen, 2);
 
-              bufferBodyArr[i].setUint32(4, this.bodys[i].token);
-              bufferBodyArr[i].setUint32(8, this.bodys[i].ts);
+              bufferBodyArr[i].writeUInt32LE(this.bodys[i].token, 4);
+              bufferBodyArr[i].writeUInt32LE(this.bodys[i].ts, 8);
               break;
             default:
               break;
@@ -207,23 +212,24 @@ class Message {
           break;
 
         case 'M':
-          bufferBodyArr[i].setUint8(0, this.bodys[i].chnlType);
-          bufferBodyArr[i].setUint8(1, this.bodys[i].chnlNumber);
-          bufferBodyArr[i].setUint16(2, this.bodys[i].chnlParam);
+          bufferBodyArr[i].writeUInt8(this.bodys[i].chnlType, 0);
+          bufferBodyArr[i].writeUInt8(this.bodys[i].chnlNumber, 1);
+          bufferBodyArr[i].writeUInt16LE(this.bodys[i].chnlParam, 2);
 
-          bufferBodyArr[i].setUint16(0, this.bodys[i].length);
-          bufferBodyArr[i].setUint8(2, this.bodys[i].mVer * 16 * 16 + this.bodys[i].mType);
-          bufferBodyArr[i].setUint8(3, this.bodys[i].mParam);
+          bufferBodyArr[i].writeUInt16LE(this.bodys[i].length, 4);
+          bufferBodyArr[i].writeUInt8(this.bodys[i].mVer * 16 * 16 + this.bodys[i].mType, 6);
+          bufferBodyArr[i].writeUInt8(this.bodys[i].mParam, 7);
 
-          for (let j = 0; j < this.bodys[i].cmds.byteLength; j++) {
-            bufferBodyArr[i].setUint8(j, this.bodys[i].cmds[j]);
-          }
+          // for (let j = 0; j < this.bodys[i].cmds.byteLength; j++) {
+          //   bufferBodyArr[i].writeUInt8(j, this.bodys[i].cmds[j]);
+          // }
+          bufferBodyArr[i].writeUIntLE(this.bodys.cmds, 8, this.bodys.cmds.byteLength);
           break;
 
         case 'H':
-          bufferBodyArr[i].setUint8(0, this.bodys[i].chnlType);
-          bufferBodyArr[i].setUint8(1, this.bodys[i].chnlNumber);
-          bufferBodyArr[i].setUint16(2, this.bodys[i].chnlParam);
+          bufferBodyArr[i].writeUInt8(this.bodys[i].chnlType, 0);
+          bufferBodyArr[i].writeUInt8(this.bodys[i].chnlNumber, 1);
+          bufferBodyArr[i].writeUInt16LE(this.bodys[i].chnlParam, 2);
           break;
 
         case 'm':  // 不应存在编码
@@ -231,7 +237,8 @@ class Message {
 
         case 'h':  // 不应存在编码
           break;
-
+        case 'f':
+          break;
         default:
           break;
       }
@@ -244,43 +251,45 @@ class Message {
     const pointer = [];
 
     if (bufferBody.byteLength !== 0) {
-      const bodyLen = bufferBody.getUint8(1) + 1;
-
-      for (let i = 0; i < bodyLen; i++) {
-        if (i === 0) {
-          pointer[0] = 0;
-        }
-        else {
-          pointer[i] = pointer[i - 1] + bufferBody.getUint16(pointer[i - 1] + 2) + 4;
+      let bodyLen = 1;
+      if (this.type === 'R') {
+        bodyLen = bufferBody.readUInt8(1) + 1;
+        for (let i = 0; i < bodyLen; i++) {
+          if (i === 0) {
+            pointer[0] = 0;
+          }
+          else {
+            pointer[i] = pointer[i - 1] + bufferBody.readUInt16LE(pointer[i - 1] + 2) + 4;
+          }
         }
       }
 
       for (let i = 0; i < bodyLen; i++) {
         switch (this.type) {
           case 'R':
-            switch (bufferBody.getUint8(pointer[i])) {
+            switch (bufferBody.readUInt8(pointer[i])) {
               case 0x01:
                 if (this.netID === 0 && this.devID === 0) { // 注册
                   bodys[i] = {
-                    rType: bufferBody.getUint8(pointer[i]),
-                    rCnt: bufferBody.getUint8(pointer[i] + 1),
-                    rLen: bufferBody.getUint16(pointer[i] + 2),
+                    rType: bufferBody.readUInt8(pointer[i]),
+                    rCnt: bufferBody.readUInt8(pointer[i] + 1),
+                    rLen: bufferBody.readUInt16LE(pointer[i] + 2),
 
-                    devType: bufferBody.getUint32(pointer[i] + 4),
-                    hVer: bufferBody.getUint16(pointer[i] + 8),
-                    sVer: bufferBody.getUint16(pointer[i] + 10),
+                    devType: bufferBody.readUInt32LE(pointer[i] + 4),
+                    hVer: bufferBody.readUInt16LE(pointer[i] + 8),
+                    sVer: bufferBody.readUInt16LE(pointer[i] + 10),
                     devName: this[decodeStr](bufferBody, pointer[i] + 12, 32),
                     seriaNo: this[decodeStr](bufferBody, pointer[i] + 44, 32)
                   }
                 } else {                                    // 登录
                   bodys[i] = {
-                    rType: bufferBody.getUint8(pointer[i]),
-                    rCnt: bufferBody.getUint8(pointer[i] + 1),
-                    rLen: bufferBody.getUint16(pointer[i] + 2),
+                    rType: bufferBody.readUInt8(pointer[i]),
+                    rCnt: bufferBody.readUInt8(pointer[i] + 1),
+                    rLen: bufferBody.readUInt16LE(pointer[i] + 2),
 
-                    devType: bufferBody.getUint32(pointer[i] + 4),
-                    hVer: bufferBody.getUint16(pointer[i] + 8),
-                    sVer: bufferBody.getUint16(pointer[i] + 10),
+                    devType: bufferBody.readUInt32LE(pointer[i] + 4),
+                    hVer: bufferBody.readUInt16LE(pointer[i] + 8),
+                    sVer: bufferBody.readUInt16LE(pointer[i] + 10),
                     devName: this[decodeStr](bufferBody, pointer[i] + 12, 32),
                     seriaNo: this[decodeStr](bufferBody, pointer[i] + 44, 32)
                   }
@@ -289,9 +298,9 @@ class Message {
 
               case 0x02:
                 bodys[i] = {
-                  rType: bufferBody.getUint8(pointer[i]),
-                  rCnt: bufferBody.getUint8(pointer[i] + 1),
-                  rLen: bufferBody.getUint16(pointer[i] + 2),
+                  rType: bufferBody.readUInt8(pointer[i]),
+                  rCnt: bufferBody.readUInt8(pointer[i] + 1),
+                  rLen: bufferBody.readUInt16LE(pointer[i] + 2),
 
                   heartBeat: this[decodeHeartBeatArr](bufferBody, pointer[i] + 4, 64)
 
@@ -311,42 +320,47 @@ class Message {
             break;
           case 'h':
             bodys[i] = {
-              chnlType: bufferBody.getUint8(pointer[i]),
-              chnlNumber: bufferBody.getUint8(pointer[i] + 1),
-              chnlParam: bufferBody.getUint16(pointer[i] + 2)
+              chnlType: bufferBody.readUInt8(0),
+              chnlNumber: bufferBody.readUInt8(1),
+              chnlParam: bufferBody.readUInt16LE(2)
             };
             break;
           default:
             break;
         }
       }
+    } else if (bufferBody.byteLength === 0 && (this.type === 'm' || this.type === 'h')) {
+
+    } else {
+      new Error('解码的消息有误！！！');
     }
 
     return bodys;
   }
 
   // 私有方法，解码字符串码
-  [decodeStr](dataView, offset, byteLen) {
+  [decodeStr](buffer, offset, byteLen) {
     let strLen = 0;
-    while (dataView.getUint8(offset + strLen) !== 0) strLen++;
+    while (buffer.readUInt8(offset + strLen) !== 0) strLen++;
 
     if (strLen <= byteLen) {
-      const strbuf = new Uint8Array(dataView.buffer, offset, strLen);
-      return String.fromCharCode.apply(String, strbuf);
+      const strbuf = new Uint8Array(buffer, offset, strLen);
+      // return String.fromCharCode.apply(String, strbuf);
+      return buffer.toString('ascii', offset, byteLen);
     }
     else {
-      console.log(new Error('string outside the bounds of the DatatView!'));
+      console.log(new Error('string outside the bounds of the buffer!'));
     }
   }
 
   // 私有方法，解码心跳响应数组内容
-  [decodeHeartBeatArr](dataView, offset, byteLen) {
+  [decodeHeartBeatArr](buffer, offset, byteLen) {
     const heartBeatArr = [];
 
     for (let i = 0; i < 16; i++) {
-      const type = dataView.getUint8(offset + i * 4);
-      const number = dataView.getUint8(offset + i * 4 + 1);
-      const param = dataView.getUint16(offset + i * 4 + 2);
+      const type = buffer.readUInt8(offset + i * 4);
+      const number = buffer.readUInt8(offset + i * 4 + 1);
+      const param = buffer.readUInt16LE(offset + i * 4 + 2);
       heartBeatArr.push({type, number, param});
     }
 
