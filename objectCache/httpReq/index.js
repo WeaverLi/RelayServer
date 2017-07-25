@@ -4,7 +4,7 @@ const redisClient = require('../redisClient');
 const HttpReqs = new HttpReqCache(redisClient);
 
 const addHttpReqToRedis = (req, res, next) => {
-  HttpReqs.add(req, res).then(id => {
+  HttpReqs.add({req, res}).then(id => {
     next(id);
   }).catch(err => {
     console.log(err);

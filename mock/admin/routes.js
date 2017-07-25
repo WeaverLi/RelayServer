@@ -29,4 +29,14 @@ router.get('/api/dev/verify', (req, res) => {
   });
 });
 
+router.get('/api/dev/update', (req, res) => {
+  const {state, details} = req.body;
+  console.log({state, details});
+
+  res.json({
+    ret: 0,
+    reason: 'OK'
+  })
+});
+
 module.exports = router;

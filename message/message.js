@@ -35,7 +35,7 @@ class Message {
           case 1:
             this.bodys.push(new MSG_R_REGIST_REQ(msgBody));
             // 更新消息头
-            this.length += 4 + 72;
+            this.length += 72;
             // 更新数据部分头
             for (let i = 0; i < this.bodys.length; i++) {
               this.bodys[i].rCnt = this.bodys.length - i - 1;
@@ -46,7 +46,7 @@ class Message {
           case 2:
             this.bodys.push(new MSG_R_HEARTBEAT_REQ(msgBody));
             // 更新消息头
-            this.length += 4 + 64;
+            this.length += 64;
             // 更新数据部分头
             for (let i = 0; i < this.bodys.length; i++) {
               this.bodys[i].rCnt = this.bodys.length - i - 1;
@@ -69,7 +69,7 @@ class Message {
             for (let i = 0; i < this.bodys.length; i++) {
               this.bodys[i].rCnt = this.bodys.length - i - 1;
             }
-            this.bodys[this.bodys.length - 1].rLen = 12;
+            this.bodys[this.bodys.length - 1].rLen = 16;
 
             break;
           case 2:
@@ -80,7 +80,7 @@ class Message {
             for (let i = 0; i < this.bodys.length; i++) {
               this.bodys[i].rCnt = this.bodys.length - i - 1;
             }
-            this.bodys[this.bodys.length - 1].rLen = 8;
+            this.bodys[this.bodys.length - 1].rLen = 12;
 
             break;
           default:
@@ -129,9 +129,9 @@ class Message {
     if (this.bodys.length >= 1 && this.type === 'r') {
       for (let i = 0; i < this.bodys.length; i++) {
         for (let j = 0; j < i; j++) {
-          newOffset += 4 + this.bodys[j].rLen;
+          newOffset += this.bodys[j].rLen;
         }
-        bufferBodyArr.push(buffer.slice(newOffset, newOffset + this.bodys[i].rLen + 4));
+        bufferBodyArr.push(buffer.slice(newOffset, newOffset + this.bodys[i].rLen));
       }
     } else if (this.bodys.length = 1 && (this.type === 'M' || this.type === 'H')) {
       bufferBodyArr.push(buffer.slice(newOffset, this.bodys.length - 4));
@@ -258,7 +258,7 @@ class Message {
             pointer[0] = 0;
           }
           else {
-            pointer[i] = pointer[i - 1] + bufferBody.readUInt16LE(pointer[i - 1] + 2) + 4;
+            pointer[i] = pointer[i - 1] + bufferBody.readUInt16LE(pointer[i - 1] + 2);
           }
         }
       }
@@ -274,11 +274,11 @@ class Message {
                     rCnt: bufferBody.readUInt8(pointer[i] + 1),
                     rLen: bufferBody.readUInt16LE(pointer[i] + 2),
 
-                    devType: bufferBody.readUInt32LE(pointer[i] + 4),
-                    hVer: bufferBody.readUInt16LE(pointer[i] + 8),
-                    sVer: bufferBody.readUInt16LE(pointer[i] + 10),
-                    devName: this[decodeStr](bufferBody, pointer[i] + 12, 32),
-                    seriaNo: this[decodeStr](bufferBody, pointer[i] + 44, 32)
+                    devType: bufferBody.readUInt16LE(pointer[i] + 4),
+                    hVer: bufferBody.readUInt8(pointer[i] + 6),
+                    sVer: bufferBody.readUInt8(pointer[i] + 7),
+                    devName: this[decodeStr](bufferBody, pointer[i] + 8, 32),
+                    seriaNo: this[decodeStr](bufferBody, pointer[i] + 40, 32)
                   }
                 } else {                                    // 登录
                   bodys[i] = {
@@ -286,11 +286,11 @@ class Message {
                     rCnt: bufferBody.readUInt8(pointer[i] + 1),
                     rLen: bufferBody.readUInt16LE(pointer[i] + 2),
 
-                    devType: bufferBody.readUInt32LE(pointer[i] + 4),
-                    hVer: bufferBody.readUInt16LE(pointer[i] + 8),
-                    sVer: bufferBody.readUInt16LE(pointer[i] + 10),
-                    devName: this[decodeStr](bufferBody, pointer[i] + 12, 32),
-                    seriaNo: this[decodeStr](bufferBody, pointer[i] + 44, 32)
+                    devType: bufferBody.readUInt16LE(pointer[i] + 4),
+                    hVer: bufferBody.readUInt8(pointer[i] + 6),
+                    sVer: bufferBody.readUInt8(pointer[i] + 7),
+                    devName: this[decodeStr](bufferBody, pointer[i] + 8, 32),
+                    seriaNo: this[decodeStr](bufferBody, pointer[i] + 40, 32)
                   }
                 }
                 break;
@@ -301,7 +301,7 @@ class Message {
                   rCnt: bufferBody.readUInt8(pointer[i] + 1),
                   rLen: bufferBody.readUInt16LE(pointer[i] + 2),
 
-                  heartBeat: this[decodeHeartBeatArr](bufferBody, pointer[i] + 4, 64)
+                  heartBeat: this[decodeHeartBeatArr](bufferBody, pointer[i] + 4, (bufferBody.readUInt16LE(pointer[i] + 2) - 4))
 
                 };
                 break;
@@ -342,20 +342,17 @@ class Message {
     let strLen = 0;
     while (buffer.readUInt8(offset + strLen) !== 0) strLen++;
 
-    if (strLen <= byteLen) {
-      const strbuf = new Uint8Array(buffer, offset, strLen);
-      return buffer.toString('ascii', offset, byteLen);
-    }
-    else {
+    if (strLen <= byteLen)
+      return buffer.slice(offset, offset + strLen).toString('ascii');
+    else
       console.log(new Error('string outside the bounds of the buffer!'));
-    }
   }
 
   // 私有方法，解码心跳响应数组内容
   [decodeHeartBeatArr](buffer, offset, byteLen) {
     const heartBeatArr = [];
 
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < (byteLen / 4); i++) {
       const type = buffer.readUInt8(offset + i * 4);
       const number = buffer.readUInt8(offset + i * 4 + 1);
       const param = buffer.readUInt16LE(offset + i * 4 + 2);

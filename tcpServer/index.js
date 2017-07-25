@@ -10,7 +10,7 @@ server.on('connection', client => {
   console.log(' remote = %s:%s', client.remoteAddress, client.remotePort);
 
   // 心跳定时20s
-  client.setTimeout(20000);
+  // client.setTimeout(20000);
   // 接收数据的编码
   // client.setEncoding('hex');
 

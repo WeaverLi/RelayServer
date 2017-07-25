@@ -16,11 +16,7 @@ function MSG_R_REGIST_REQ({rType = 1, rCnt = 0, rLen = 0, devType = 0, hVer = 0,
 }
 
 // 心跳请求消息,多个通道的消息
-function MSG_R_HEARTBEAT_REQ({
-                               rType = 2, rCnt = 0, rLen = 0, heartBeat = new Array(16).fill({
-    type: 0, number: 0, param: 0
-  })
-                             }) {
+function MSG_R_HEARTBEAT_REQ({rType = 2, rCnt = 0, rLen = 0, heartBeat = []}) {
   this.rType = rType;
   this.rCnt = rCnt;
   this.rLen = rLen;
