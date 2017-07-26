@@ -5,7 +5,7 @@ module.exports = ConfigFile;
 /**  ConfigFile类使用方法
  *      属性：{
  *              aid,                      // 所属电器id，对无线命令码的生成(buildBOFU)有作用
- *              type,                     // 电器类型,0,1,2...
+ *              type,                     // 命令类型(高三位)，面板类型(低三位)
  *              applianceType,            // 电器类型名，汉字，16字节
  *              manufact,                 // 电器厂家，汉子，16字节
  *              model,                    // 电器型号，汉子，32字节

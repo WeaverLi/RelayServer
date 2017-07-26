@@ -27,7 +27,7 @@ class DeviceObjCache {
     });
   }
 
-  async find(id) {
+  find(id) {
     this.redisClient.hgetall(id, (err, res) => {
       if (err) return err;
       return res;

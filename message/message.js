@@ -5,9 +5,11 @@ const {
   MSG_R_HEARTBEAT_RES,
   MSG_M_COMMAND_REQ,
   MSG_H_COMMAND_REQ,
-  MSG_M_COMMAND_RES,
+  // MSG_M_COMMAND_RES,
   MSG_H_COMMAND_RES
 } = require('./MessageBodyTypes');
+
+const errorHandle = require('./errorHanding');
 
 // 私有方法名定义为Symbol类型
 const encodeHead = Symbol('encodeHead');                    // 私有方法名，编码消息头部（20字节）
@@ -30,35 +32,6 @@ class Message {
 
   addBody(msgBodyType, msgBody) {
     switch (this.type) {
-      case 'R':                  // 应该用不到
-        switch (msgBodyType) {
-          case 1:
-            this.bodys.push(new MSG_R_REGIST_REQ(msgBody));
-            // 更新消息头
-            this.length += 72;
-            // 更新数据部分头
-            for (let i = 0; i < this.bodys.length; i++) {
-              this.bodys[i].rCnt = this.bodys.length - i - 1;
-            }
-            this.bodys[this.bodys.length - 1].rLen = 72;
-
-            break;
-          case 2:
-            this.bodys.push(new MSG_R_HEARTBEAT_REQ(msgBody));
-            // 更新消息头
-            this.length += 64;
-            // 更新数据部分头
-            for (let i = 0; i < this.bodys.length; i++) {
-              this.bodys[i].rCnt = this.bodys.length - i - 1;
-            }
-            this.bodys[this.bodys.length - 1].rLen = 64;
-
-            break;
-          default:
-            break;
-        }
-        break;
-
       case 'r':
         switch (msgBodyType) {
           case 1:
@@ -84,6 +57,10 @@ class Message {
 
             break;
           default:
+            errorHandle({
+              type: 1,
+              message: '注册或心跳响应Message类的addBody(msgBodyType,msgBody)方法msgBodyType参数不合法！'
+            });
             break;
         }
         break;
@@ -91,9 +68,9 @@ class Message {
       case 'M':
         this.bodys.push(new MSG_M_COMMAND_REQ(msgBody));
         // 更新消息头
-        this.length += 4 + 4 + this.bodys[this.bodys.length - 1].cmds.byteLength;
+        this.length += 4 + 4 + this.bodys[this.bodys.length - 1].cmds.length;
         // 更新数据长度信息
-        this.bodys[this.bodys.length - 1].length = this.bodys[this.bodys.length - 1].cmds.byteLength;
+        this.bodys[this.bodys.length - 1].length = this.bodys[this.bodys.length - 1].cmds.length;
 
         break;
 
@@ -103,65 +80,70 @@ class Message {
         this.length += 4;
 
         break;
-
-      case 'm':                            // 应该用不到
-        break;
-
-      case 'h':                            // 应该用不到
-        this.bodys.push(new MSG_H_COMMAND_RES(msgBody));
-        // 更新消息头
-        this.length += 4;
-
-        break;
-
       default:
+        errorHandle({
+          type: 1,
+          message: '将要编码的消息类型不对或改消息无body！应为r,M,H中的一种'
+        });
         break;
     }
   }
 
   // 编码
   encode() {
-    const buffer = Buffer.alloc(this.length);
-    const bufferHead = buffer;
-    const bufferBodyArr = [];
-    let newOffset = byteOffset;
+    if (this.length >= 20) {
+      const buffer = Buffer.alloc(this.length);
+      const bufferHead = buffer;
+      const bufferBodyArr = [];
+      let newOffset = byteOffset;
 
-    if (this.bodys.length >= 1 && this.type === 'r') {
-      for (let i = 0; i < this.bodys.length; i++) {
-        for (let j = 0; j < i; j++) {
-          newOffset += this.bodys[j].rLen;
+      if (this.bodys.length >= 1 && this.type === 'r') {
+        for (let i = 0; i < this.bodys.length; i++) {
+          for (let j = 0; j < i; j++) {
+            newOffset += this.bodys[j].rLen;
+          }
+          bufferBodyArr.push(buffer.slice(newOffset, newOffset + this.bodys[i].rLen));
         }
-        bufferBodyArr.push(buffer.slice(newOffset, newOffset + this.bodys[i].rLen));
+      } else if (this.bodys.length = 1 && (this.type === 'M' || this.type === 'H')) {
+        bufferBodyArr.push(buffer.slice(newOffset, this.bodys.length - 4));
+      } else if (this.bodys.length === 0 && this.type === 'f') {
+
+      } else {
+        errorHandle({
+          type: 1,
+          message: '编码的body为空或编码消息类型不对'
+        });
       }
-    } else if (this.bodys.length = 1 && (this.type === 'M' || this.type === 'H')) {
-      bufferBodyArr.push(buffer.slice(newOffset, this.bodys.length - 4));
-    } else if (this.type === 'f') {
 
+      this[encodeHead](bufferHead);
+      this[encodeBody](bufferBodyArr);
+
+      return buffer;
     } else {
-      new Error('给出的要编码的消息不正确！');
+      errorHandle({
+        type: 1,
+        message: '编码消息长度不对'
+      });
     }
-
-    this[encodeHead](bufferHead);
-    this[encodeBody](bufferBodyArr);
-
-    return buffer;
   }
 
   // 解码
   decode(buffer) {
-    const bufferHead = buffer.slice(0, byteOffset);
-    const bufferBody = buffer.slice(byteOffset, buffer.byteLength - 4);
+    if (buffer.byteLength >= 20) {
+      const bufferHead = buffer.slice(0, byteOffset);
+      const bufferBody = buffer.slice(byteOffset, buffer.byteLength - 4);
 
-    this.type = String.fromCharCode(bufferHead.readUInt8(1));
-    this.length = bufferHead.readUInt16LE(2);
+      this.type = String.fromCharCode(bufferHead.readUInt8(1));
+      this.length = bufferHead.readUInt16LE(2);
 
-    this.token = bufferHead.readUInt16LE(4);
-    this.netID = bufferHead.readUInt32LE(8);
-    this.devID = bufferHead.readUInt32LE(12);
+      this.token = bufferHead.readUInt16LE(4);
+      this.netID = bufferHead.readUInt32LE(8);
+      this.devID = bufferHead.readUInt32LE(12);
 
-    this.bodys = this[decodeBody](bufferBody);
+      this.bodys = this[decodeBody](bufferBody);
 
-    return this;
+      return this;
+    }
   }
 
 
@@ -170,6 +152,7 @@ class Message {
     bufferHead.writeUInt8(0x7e, 0);
     bufferHead.writeUInt8(this.type.charCodeAt(0), 1);
     bufferHead.writeUInt16LE(this.length, 2);
+
 
     bufferHead.writeUInt32LE(this.token, 4);
     bufferHead.writeUInt32LE(this.netID, 8);
@@ -183,9 +166,6 @@ class Message {
   [encodeBody](bufferBodyArr) {
     for (let i = 0; i < this.bodys.length; i++) {
       switch (this.type) {
-        case 'R':    // 不应存在编码
-          break;
-
         case 'r':
           switch (this.bodys[i].rType) {
             case 1:
@@ -219,9 +199,6 @@ class Message {
           bufferBodyArr[i].writeUInt8(this.bodys[i].mVer * 16 * 16 + this.bodys[i].mType, 6);
           bufferBodyArr[i].writeUInt8(this.bodys[i].mParam, 7);
 
-          // for (let j = 0; j < this.bodys[i].cmds.byteLength; j++) {
-          //   bufferBodyArr[i].writeUInt8(j, this.bodys[i].cmds[j]);
-          // }
           bufferBodyArr[i].writeUIntLE(this.bodys.cmds, 8, this.bodys.cmds.byteLength);
           break;
 
@@ -230,15 +207,11 @@ class Message {
           bufferBodyArr[i].writeUInt8(this.bodys[i].chnlNumber, 1);
           bufferBodyArr[i].writeUInt16LE(this.bodys[i].chnlParam, 2);
           break;
-
-        case 'm':  // 不应存在编码
-          break;
-
-        case 'h':  // 不应存在编码
-          break;
-        case 'f':
-          break;
         default:
+          errorHandle({
+            type: 1,
+            message: '编码类型有误'
+          });
           break;
       }
     }
@@ -280,18 +253,11 @@ class Message {
                     devName: this[decodeStr](bufferBody, pointer[i] + 8, 32),
                     seriaNo: this[decodeStr](bufferBody, pointer[i] + 40, 32)
                   }
-                } else {                                    // 登录
-                  bodys[i] = {
-                    rType: bufferBody.readUInt8(pointer[i]),
-                    rCnt: bufferBody.readUInt8(pointer[i] + 1),
-                    rLen: bufferBody.readUInt16LE(pointer[i] + 2),
-
-                    devType: bufferBody.readUInt16LE(pointer[i] + 4),
-                    hVer: bufferBody.readUInt8(pointer[i] + 6),
-                    sVer: bufferBody.readUInt8(pointer[i] + 7),
-                    devName: this[decodeStr](bufferBody, pointer[i] + 8, 32),
-                    seriaNo: this[decodeStr](bufferBody, pointer[i] + 40, 32)
-                  }
+                } else {
+                  errorHandle({
+                    type: 2,
+                    message: '解码的消息为注册消息，但设备显示已注册！！！'
+                  });
                 }
                 break;
 
@@ -305,17 +271,14 @@ class Message {
 
                 };
                 break;
+              default:
+                errorHandle({
+                  type: 2,
+                  message: '解码的注册或心跳请求消息有误！！！'
+                });
+                break;
             }
 
-            break;
-          case 'r':           // 不需要解码
-            break;
-          case 'M':           // 不需要解码
-            break;
-          case 'H':           // 不需要解码
-            break;
-          case 'm':      // 'm'没有bodys
-            // bodys[]为空
             break;
           case 'h':
             bodys[i] = {
@@ -325,13 +288,20 @@ class Message {
             };
             break;
           default:
+            errorHandle({
+              type:2,
+              message:'解码的消息类型有误！！！'
+            });
             break;
         }
       }
-    } else if (bufferBody.byteLength === 0 && (this.type === 'm' || this.type === 'h')) {
+    } else if (bufferBody.byteLength === 0 && (this.type === 'm' || this.type === 'f')) {
 
     } else {
-      new Error('解码的消息有误！！！');
+      errorHandle({
+        type: 1,
+        message: '消息格式有误！！！'
+      });
     }
 
     return bodys;
