@@ -27,7 +27,8 @@ const {
   getModeByACCKey,
   getTempByACCKey,
   getSpeedByACCKey,
-  strToUint8Arr
+  strToUint8Arr,
+  uint8ArrToStr
 } = require('./loadCfgFile');
 
 class ConfigFile {
@@ -58,9 +59,9 @@ class ConfigFile {
       return -2;
     }
     this.type = fileInfo.ekind;
-    this.applianceType = String.fromCharCode.apply(String, fileInfo.etype);
-    this.manufact = String.fromCharCode.apply(String, fileInfo.Manufacturer);
-    this.model = String.fromCharCode.apply(String, fileInfo.model);
+    this.applianceType = uint8ArrToStr(fileInfo.etype)/*String.fromCharCode.apply(String, fileInfo.etype)*/;
+    this.manufact = uint8ArrToStr(fileInfo.Manufacturer)/*String.fromCharCode.apply(String, fileInfo.Manufacturer)*/;
+    this.model = uint8ArrToStr(fileInfo.model)/*String.fromCharCode.apply(String, fileInfo.model)*/;
 
     //获得循环次数
     const loopct = (fileInfo.ekind === TYPE_AC) ? fileInfo.indexAreaSize : fileInfo.cmdNum;
@@ -135,7 +136,7 @@ class ConfigFile {
       if (cmdBuffer.byteLength !== 0) {
         cmdArr = new Uint8Array(cmdBuffer);
         const command = new Command({
-          name: (cmdInfo.name[0] !== 0) ? String.fromCharCode.apply(String, cmdInfo.name) : '',
+          name: (cmdInfo.name[0] !== 0) ? uint8ArrToStr(cmdInfo.name) : '',
           locale: cmdInfo.locale,
           style: cmdInfo.style,
           key: cmdInfo.key,

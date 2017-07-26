@@ -4,12 +4,14 @@ const redisClient = require('../redisClient');
 const HttpReqs = new HttpReqCache(redisClient);
 
 const addHttpReqToRedis = (req, res, next) => {
-  HttpReqs.add({req, res}).then(id => {
-    next(id);
-  }).catch(err => {
-    console.log(err);
-    return err;
-  });
+  // HttpReqs.add({req, res}).then(id => {
+  //   next(id);
+  // }).catch(err => {
+  //   console.log(err);
+  //   return err;
+  // });
+  // HttpReqs.add({req, res});
+  next();
 };
 
 // 返回http请求res

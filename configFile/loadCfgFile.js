@@ -338,6 +338,12 @@ function strToUint8Arr(str, len) {
   return Arr;
 }
 
+function uint8ArrToStr(uint8Arr) {
+  let i = 0;
+  while (uint8Arr[i] !== 0) i++;
+  return Buffer.from(uint8Arr).slice(0, i).toString('utf8');
+}
+
 module.exports = {
   readFile,            // readFile(fileBuffer); 参数fileBuffer为文件的Buffer对象，返回成功为fileInfo,失败为为错误码
   readCommand,         // readCommand(fileBuffer,fileInfo,index); 参数index为，返回成功为cmdInfo,失败为错误码
@@ -350,5 +356,6 @@ module.exports = {
   getTempByACCKey,
   getSpeedByACCKey,
   getFanByACCKey,
-  strToUint8Arr
+  strToUint8Arr,
+  uint8ArrToStr
 };
