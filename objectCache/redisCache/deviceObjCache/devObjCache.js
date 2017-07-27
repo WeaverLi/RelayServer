@@ -7,7 +7,7 @@ class DeviceObjCache {
     this.redisClient.hmset(
         `${netID}-${devID}`,
         {
-          tcpClient: JSON.stringify(tcpClient),
+          tcpClient,
           token
         },
         (err, res) => {

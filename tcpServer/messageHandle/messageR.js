@@ -70,7 +70,7 @@ const messageRHandle = (tcpClient, msg) => {
         })
       } else if (body.rType === 2) {                                // 心跳
         // updateDevObjToRedis(`${msg.netID}-${msg.devID}`, body.heartBeat);   // 更新设备对象
-        updateDevObjToRedis('1500978583-875', {token: msg.token, heartBeat: body.heartBeat});   // 更新设备对象
+        updateDevObjToRedis(`${msg.netID}-${msg.devID}`, {token: msg.token, heartBeat: body.heartBeat});   // 更新设备对象
 
         const optionHeartBeat = {
           method: 'GET',
