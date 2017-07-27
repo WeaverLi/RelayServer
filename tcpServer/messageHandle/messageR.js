@@ -11,7 +11,7 @@ const messageRHandle = (tcpClient, msg) => {
       if (body.rType === 1 && msg.netID === 0 && msg.devID === 0) { //注册
         const optionSignup = {
           method: 'GET',
-          uri: 'http://localhost:4000/api/dev/verify',
+          uri: 'http://121.40.181.130:4000/api/dev/verify',
           body: {
             sn: body.seriaNo,
             type: body.devType,
@@ -45,7 +45,7 @@ const messageRHandle = (tcpClient, msg) => {
       } else if (body.rType === 1 && netID !== 0 && devID !== 0) {  // 登录
         const optionSignin = {
           method: 'GET',
-          uri: 'http://localhost:4000/api/dev/verify',
+          uri: 'http://121.40.181.130:4000/api/dev/verify',
           body: {
             sn: body.seriaNo,
             type: body.devType,
@@ -74,7 +74,7 @@ const messageRHandle = (tcpClient, msg) => {
 
         const optionHeartBeat = {
           method: 'GET',
-          uri: 'http://localhost:4000/api/dev/update',
+          uri: 'http://121.40.181.130:4000/api/dev/update',
           body: {
             // id: ,
             state: '',
