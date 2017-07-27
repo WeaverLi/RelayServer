@@ -147,6 +147,12 @@ class Message {
       this.bodys = this[decodeBody](bufferBody);
 
       return this;
+    }else {
+      errorHandle({
+        type:2,
+        message:'解码的消息错误！！'
+      });
+      return -1;
     }
   }
 

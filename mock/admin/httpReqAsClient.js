@@ -2,11 +2,10 @@ const rp = require('request-promise');
 
 const options1 = {
   method: 'POST',
-  uri: 'http://localhost:5000/api/dev/control',
+  uri: 'http://121.40.181.130:5000/api/dev/control',
   body: {
-    appkey: '127.0.0.1:5000',
-    did: 1,
-    seq: 123
+    appkey: '121.40.181.130:5000',
+    did: 0,
   },
   json: true // Automatically stringifies the body to JSON
 };

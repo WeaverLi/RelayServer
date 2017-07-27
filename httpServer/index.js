@@ -51,7 +51,7 @@ app.use(function (err, req, res, next) {
 
 app.set('port', process.env.PORT || 5000);
 
-const server = app.listen(app.get('port'), function () {
+const server = app.listen(app.get('port'), '121.40.181.130', function () {
   console.log('Express server listening on port ' + server.address().port);
 });
 

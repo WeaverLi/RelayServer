@@ -25,7 +25,8 @@ router.get('/api/dev/verify', (req, res) => {
 
   res.json({
     ret: 0,
-    reason: 'OK'
+    reason: 'OK',
+    did:0
   });
 });
 
