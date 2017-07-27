@@ -1,22 +1,19 @@
-const uuidv1 = require('uuid/v1');
-
 class HttpReqCache {
   constructor(redisClient) {
     this.redisClient = redisClient;
   }
 
-  add({req, res}) {
-    const uuid = uuidv1();
+  add(id, {req, res}) {
 
     this.redisClient.hmset(
-        `http:${uuid}`,
+        `http:${id}`,
         {
           req: JSON.stringify(req),
           res: JSON.stringify(res)
         },
         (err, res) => {
           if (err) return err;
-          return uuid;
+          return res;
         }
     );
   }

@@ -282,6 +282,7 @@ class Message {
                   type: 2,
                   message: '解码的注册或心跳请求消息有误！！！'
                 });
+                return -1;
                 break;
             }
 
@@ -298,6 +299,7 @@ class Message {
               type:2,
               message:'解码的消息类型有误！！！'
             });
+            return -1;
             break;
         }
       }
@@ -308,6 +310,7 @@ class Message {
         type: 1,
         message: '消息格式有误！！！'
       });
+      return -1;
     }
 
     return bodys;

@@ -24,7 +24,7 @@ const messageRHandle = (tcpClient, msg) => {
             // 分配token,netID,devID
             const param = {
               token: 0,
-              netID: Math.round((new Date()).getTime() / 1000),
+              netID: Math.round((new Date().getTime() % 1000)),
               devID: Math.round((new Date().getTime() % 1000))
             };
             // 创建设备对象
@@ -36,7 +36,7 @@ const messageRHandle = (tcpClient, msg) => {
             const msgBuffer = sendmsg.encode();
             sendDataToDevice(tcpClient, msgBuffer);
           } else {                      // 不可以注册
-            // 发送失败消息
+            // 发送注册失败消息给设备
           }
         }).catch(err => {
           new Error('发送验证消息失败！');
