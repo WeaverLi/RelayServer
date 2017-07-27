@@ -44,7 +44,7 @@ server.on('connection', client => {
 });
 
 // 服务器监听的IP和端口号
-server.listen(/*5001, '192.168.0.108',*/3000, 'localhost', () => {
+server.listen(/*5001, '192.168.0.108',*/5345, '121.40.181.130', () => {
   console.log('Server listening: ', JSON.stringify(server.address()));
 
   server.on('close', () => console.log('Server Terminated'));

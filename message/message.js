@@ -5,7 +5,7 @@ const {
   MSG_R_HEARTBEAT_RES,
   MSG_M_COMMAND_REQ,
   MSG_H_COMMAND_REQ,
-  // MSG_M_COMMAND_RES,
+  MSG_M_COMMAND_RES,
   MSG_H_COMMAND_RES
 } = require('./MessageBodyTypes');
 
@@ -61,6 +61,7 @@ class Message {
               type: 1,
               message: '注册或心跳响应Message类的addBody(msgBodyType,msgBody)方法msgBodyType参数不合法！'
             });
+              return -1;
             break;
         }
         break;
@@ -85,6 +86,7 @@ class Message {
           type: 1,
           message: '将要编码的消息类型不对或改消息无body！应为r,M,H中的一种'
         });
+          return -1;
         break;
     }
   }
@@ -113,6 +115,7 @@ class Message {
           type: 1,
           message: '编码的body为空或编码消息类型不对'
         });
+        return -1;
       }
 
       this[encodeHead](bufferHead);
@@ -124,6 +127,7 @@ class Message {
         type: 1,
         message: '编码消息长度不对'
       });
+      return -1;
     }
   }
 
@@ -212,6 +216,7 @@ class Message {
             type: 1,
             message: '编码类型有误'
           });
+            return -1;
           break;
       }
     }
@@ -258,6 +263,7 @@ class Message {
                     type: 2,
                     message: '解码的消息为注册消息，但设备显示已注册！！！'
                   });
+                  return -1;
                 }
                 break;
 
