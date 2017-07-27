@@ -4,6 +4,7 @@ const redisClient = require('../redisClient');
 const DevObjs = new DeviceObjCache(redisClient);
 
 const addDevObjToRedis = (tcpClient, {token, netID, devID}) => {
+  console.log(tcpClient);
   return DevObjs.add({tcpClient, token, netID, devID});
 };
 
