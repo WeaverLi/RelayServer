@@ -11,4 +11,5 @@ router.post('/api/dev/query', addHttpReqToRedis, query);
 // 控制
 router.post('/api/dev/control', addHttpReqToRedis, control);
 
+
 module.exports = router;
