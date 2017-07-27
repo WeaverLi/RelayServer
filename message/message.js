@@ -153,7 +153,7 @@ class Message {
 
   // 私有方法，编码头部
   [encodeHead](bufferHead) {
-    bufferHead.writeUInt8(0x7e, 0);
+    bufferHead.writeUInt8(0xe7, 0);
     bufferHead.writeUInt8(this.type.charCodeAt(0), 1);
     bufferHead.writeUInt16LE(this.length, 2);
 

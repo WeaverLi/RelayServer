@@ -13,7 +13,7 @@ const control = (req, res) => {
     configFile.loadFile('标准开关1527.cfg');
     console.log(configFile.cmds[0]);
     // 封装消息
-    const message = new Message({type:'M',token:0,netID:1500978583,devID:875});
+    const message = new Message({type: 'M', token: 0, netID: 1500978583, devID: 875});
     const msgBody = {
       chnlType: 65,
       chnlNumber: 1,
@@ -22,18 +22,18 @@ const control = (req, res) => {
       mVer: 1,
       mType: configFile.type >> 5,
       mParam: configFile.cmds[0].cmd.key & 0x00ff,
-      cmds:configFile.cmds[0].cmd
+      cmds: configFile.cmds[0].cmd
     };
     message.addBody(null, msgBody);
     console.log(message);
-    // message.encode();
-    // // 查找设备对象并发控制请求给设备
-    // const res = findDevObjFromRedis('1500978583-875');
+    const msgBuffer = message.encode();
+    // 查找设备对象并发控制请求给设备
+    const res = findDevObjFromRedis('1500978583-875');
     // console.log(res);
+    writeData(res.tcpClient, msgBuffer);
   } else {
     new Error('错误！！！');
   }
-
 };
 
 module.exports = control;
